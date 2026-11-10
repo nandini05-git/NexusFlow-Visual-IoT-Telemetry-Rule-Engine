@@ -1,0 +1,22 @@
+{
+  "name": "nexusflow-backend",
+  "version": "1.0.0",
+  "description": "NexusFlow IoT Telemetry Ingestion and Rule Engine Backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "mock": "node scripts/mockSensor.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
