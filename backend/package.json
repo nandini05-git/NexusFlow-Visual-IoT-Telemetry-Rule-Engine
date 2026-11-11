@@ -7,12 +7,16 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "mock": "node scripts/mockSensor.js"
+    "mock": "node scripts/mockSensor.js",
+    "test:auth": "node scripts/testAuth.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-validator": "^7.3.2",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
     "ws": "^8.18.0"
   },

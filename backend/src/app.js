@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/auth.routes.js';
 import ingestRoutes from './routes/ingest.routes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
@@ -9,11 +10,13 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: '*', // Allow frontend development requests
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: '*', // Allow frontend development requests
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -33,14 +36,18 @@ app.get('/', (req, res) => {
     description: 'Visual IoT Telemetry & Rule Engine API',
     endpoints: {
       health: 'GET /api/health',
+      authRegister: 'POST /api/auth/register',
+      authLogin: 'POST /api/auth/login',
+      authMe: 'GET /api/auth/me',
       ingest: 'POST /api/ingest',
       ingestBatch: 'POST /api/ingest/batch',
-      telemetry: 'GET /api/telemetry?deviceId=&limit=',
+      telemetry: 'GET /api/telemetry?deviceId=&limit= (Protected)',
     },
   });
 });
 
-// API routes
+// Auth and Ingestion routes
+app.use('/api/auth', authRoutes);
 app.use('/api', ingestRoutes);
 
 // Error handling
