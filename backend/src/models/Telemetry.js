@@ -38,7 +38,11 @@ const telemetrySchema = new mongoose.Schema(
   }
 );
 
+// High-performance compound indexes for telemetry queries and aggregations
 telemetrySchema.index({ 'metadata.deviceId': 1, timestamp: -1 });
+telemetrySchema.index({ 'metadata.sensorType': 1, timestamp: -1 });
+telemetrySchema.index({ 'metadata.deviceId': 1, 'metadata.sensorType': 1, timestamp: -1 });
+telemetrySchema.index({ timestamp: -1 });
 
 const Telemetry = mongoose.model('Telemetry', telemetrySchema);
 

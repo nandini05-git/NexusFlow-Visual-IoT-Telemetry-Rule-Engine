@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "mock": "node scripts/mockSensor.js",
-    "test:auth": "node scripts/testAuth.js"
+    "test:auth": "node scripts/testAuth.js",
+    "loadtest": "node scripts/loadTest.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

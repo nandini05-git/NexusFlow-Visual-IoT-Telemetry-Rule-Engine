@@ -4,19 +4,22 @@ import {
   ingestSingle,
   ingestBatch,
   getTelemetry,
+  getTelemetryStats,
 } from '../controllers/ingest.controller.js';
 import { requireAuth } from '../middleware/auth.js';
+import { optionalApiKeyCheck } from '../middleware/apiKeyAuth.js';
 
 const router = express.Router();
 
-// Health check
+// System health check (public)
 router.get('/health', getHealth);
 
-// Ingestion endpoints (open for IoT devices/sensors)
-router.post('/ingest', ingestSingle);
-router.post('/ingest/batch', ingestBatch);
+// Ingestion endpoints (device facing, optional x-api-key check)
+router.post('/ingest', optionalApiKeyCheck, ingestSingle);
+router.post('/ingest/batch', optionalApiKeyCheck, ingestBatch);
 
-// Telemetry query endpoint (protected with JWT auth)
+// Telemetry aggregation and query endpoints (protected by JWT auth)
+router.get('/telemetry/stats', requireAuth, getTelemetryStats);
 router.get('/telemetry', requireAuth, getTelemetry);
 
 export default router;

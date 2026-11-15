@@ -1,6 +1,8 @@
 import Telemetry from '../models/Telemetry.js';
 import { getDBStatus } from '../config/db.js';
 
+const MAX_BATCH_SIZE = 10000;
+
 // Helper to normalize flat or nested payloads
 const normalizeReading = (body) => {
   if (!body || typeof body !== 'object') return null;
@@ -10,7 +12,12 @@ const normalizeReading = (body) => {
   const sensorType = body.sensorType || metadata.sensorType;
   const unit = body.unit !== undefined ? body.unit : (metadata.unit || '');
   const rawValue = body.value;
-  const numericValue = typeof rawValue === 'number' ? rawValue : (rawValue !== null && rawValue !== undefined && !isNaN(Number(rawValue)) ? Number(rawValue) : undefined);
+  const numericValue =
+    typeof rawValue === 'number'
+      ? rawValue
+      : rawValue !== null && rawValue !== undefined && !isNaN(Number(rawValue))
+      ? Number(rawValue)
+      : undefined;
 
   return {
     metadata: {
@@ -40,7 +47,12 @@ export const ingestSingle = async (req, res, next) => {
   try {
     const normalized = normalizeReading(req.body);
 
-    if (!normalized || !normalized.metadata.deviceId || !normalized.metadata.sensorType || normalized.value === undefined) {
+    if (
+      !normalized ||
+      !normalized.metadata.deviceId ||
+      !normalized.metadata.sensorType ||
+      normalized.value === undefined
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Invalid payload. deviceId, sensorType, and numeric value are required.',
@@ -66,7 +78,7 @@ export const ingestSingle = async (req, res, next) => {
   }
 };
 
-// POST /api/ingest/batch
+// POST /api/ingest/batch (capped at 10,000 items)
 export const ingestBatch = async (req, res, next) => {
   try {
     const rawList = Array.isArray(req.body) ? req.body : req.body.readings;
@@ -78,12 +90,24 @@ export const ingestBatch = async (req, res, next) => {
       });
     }
 
+    if (rawList.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({
+        success: false,
+        message: `Batch payload of ${rawList.length} exceeds maximum allowed limit of ${MAX_BATCH_SIZE} readings.`,
+      });
+    }
+
     const docs = [];
     const invalidItems = [];
 
     rawList.forEach((item, index) => {
       const normalized = normalizeReading(item);
-      if (normalized && normalized.metadata.deviceId && normalized.metadata.sensorType && normalized.value !== undefined) {
+      if (
+        normalized &&
+        normalized.metadata.deviceId &&
+        normalized.metadata.sensorType &&
+        normalized.value !== undefined
+      ) {
         docs.push(normalized);
       } else {
         invalidItems.push({ index, item, reason: 'Missing deviceId, sensorType, or value' });
@@ -104,7 +128,6 @@ export const ingestBatch = async (req, res, next) => {
     try {
       inserted = await Telemetry.insertMany(docs, { ordered: false });
     } catch (bulkError) {
-      // If ordered: false, some may succeed while others fail
       if (bulkError.insertedDocs) {
         inserted = bulkError.insertedDocs;
       }
@@ -137,15 +160,33 @@ export const ingestBatch = async (req, res, next) => {
   }
 };
 
-// GET /api/telemetry?deviceId=&limit=
+// GET /api/telemetry?deviceId=&sensorType=&from=&to=&limit=
 export const getTelemetry = async (req, res, next) => {
   try {
-    const { deviceId, limit } = req.query;
-    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
+    const { deviceId, sensorType, from, to, limit } = req.query;
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 1000);
 
     const query = {};
     if (deviceId) {
       query['metadata.deviceId'] = String(deviceId).trim();
+    }
+    if (sensorType) {
+      query['metadata.sensorType'] = String(sensorType).trim();
+    }
+    if (from || to) {
+      query.timestamp = {};
+      if (from) {
+        const fromDate = new Date(from);
+        if (!isNaN(fromDate.getTime())) {
+          query.timestamp.$gte = fromDate;
+        }
+      }
+      if (to) {
+        const toDate = new Date(to);
+        if (!isNaN(toDate.getTime())) {
+          query.timestamp.$lte = toDate;
+        }
+      }
     }
 
     const readings = await Telemetry.find(query)
@@ -156,7 +197,73 @@ export const getTelemetry = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: readings.length,
+      limit: parsedLimit,
       data: readings,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/telemetry/stats?deviceId=&sensorType=&minutes=
+export const getTelemetryStats = async (req, res, next) => {
+  try {
+    const { deviceId, sensorType, minutes } = req.query;
+    const parsedMinutes = Math.min(Math.max(parseInt(minutes, 10) || 60, 1), 10080); // Default 60 min, up to 7 days
+    const windowStart = new Date(Date.now() - parsedMinutes * 60 * 1000);
+
+    const matchStage = {
+      timestamp: { $gte: windowStart },
+    };
+
+    if (deviceId) {
+      matchStage['metadata.deviceId'] = String(deviceId).trim();
+    }
+    if (sensorType) {
+      matchStage['metadata.sensorType'] = String(sensorType).trim();
+    }
+
+    const aggResult = await Telemetry.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          min: { $min: '$value' },
+          max: { $max: '$value' },
+          avg: { $avg: '$value' },
+          firstTimestamp: { $min: '$timestamp' },
+          lastTimestamp: { $max: '$timestamp' },
+        },
+      },
+    ]);
+
+    const stats = aggResult[0] || {
+      count: 0,
+      min: null,
+      max: null,
+      avg: null,
+      firstTimestamp: null,
+      lastTimestamp: null,
+    };
+
+    return res.status(200).json({
+      success: true,
+      filter: {
+        deviceId: deviceId || 'all',
+        sensorType: sensorType || 'all',
+        minutes: parsedMinutes,
+        windowStart: windowStart.toISOString(),
+        windowEnd: new Date().toISOString(),
+      },
+      stats: {
+        count: stats.count,
+        min: stats.min !== null ? Math.round(stats.min * 100) / 100 : null,
+        max: stats.max !== null ? Math.round(stats.max * 100) / 100 : null,
+        avg: stats.avg !== null ? Math.round(stats.avg * 100) / 100 : null,
+        firstTimestamp: stats.firstTimestamp,
+        lastTimestamp: stats.lastTimestamp,
+      },
     });
   } catch (error) {
     next(error);

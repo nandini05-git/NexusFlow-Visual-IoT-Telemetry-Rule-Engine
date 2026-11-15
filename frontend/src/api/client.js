@@ -44,21 +44,37 @@ export const checkHealth = async () => {
   return response.data;
 };
 
-export const getTelemetry = async (deviceId = '', limit = 50) => {
+export const getTelemetry = async (deviceId = '', limit = 100, sensorType = '', from = '', to = '') => {
   const params = {};
   if (deviceId) params.deviceId = deviceId;
   if (limit) params.limit = limit;
+  if (sensorType) params.sensorType = sensorType;
+  if (from) params.from = from;
+  if (to) params.to = to;
   const response = await client.get('/api/telemetry', { params });
   return response.data;
 };
 
-export const ingestReading = async (reading) => {
-  const response = await client.post('/api/ingest', reading);
+export const getTelemetryStats = async (deviceId = '', minutes = 60, sensorType = '') => {
+  const params = {};
+  if (deviceId) params.deviceId = deviceId;
+  if (minutes) params.minutes = minutes;
+  if (sensorType) params.sensorType = sensorType;
+  const response = await client.get('/api/telemetry/stats', { params });
   return response.data;
 };
 
-export const ingestBatch = async (readings) => {
-  const response = await client.post('/api/ingest/batch', readings);
+export const ingestReading = async (reading, apiKey = '') => {
+  const headers = {};
+  if (apiKey) headers['x-api-key'] = apiKey;
+  const response = await client.post('/api/ingest', reading, { headers });
+  return response.data;
+};
+
+export const ingestBatch = async (readings, apiKey = '') => {
+  const headers = {};
+  if (apiKey) headers['x-api-key'] = apiKey;
+  const response = await client.post('/api/ingest/batch', readings, { headers });
   return response.data;
 };
 
