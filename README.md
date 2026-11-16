@@ -1,10 +1,51 @@
 # NexusFlow - Visual IoT Telemetry & Rule Engine
 
-NexusFlow is an enterprise-grade IoT telemetry ingestion pipeline and reactive rule engine built on the **MERN** stack (MongoDB, Express, React, Node.js). It enables engineers to ingest high-frequency IoT sensor telemetry into MongoDB Time-Series collections and visually model event-driven processing pipelines using an interactive node canvas powered by React Flow.
+NexusFlow is an enterprise-grade IoT telemetry ingestion pipeline and reactive rule engine built on the **MERN** stack (MongoDB, Express, React, Node.js). It enables engineers to ingest high-frequency IoT sensor telemetry into native MongoDB Time-Series collections and visually model event-driven processing pipelines using an interactive node canvas powered by React Flow.
 
 ---
 
 ## ⚡ Architecture & Tech Stack
+
+```mermaid
+flowchart TD
+  subgraph IoT_Layer ["IoT & Hardware Simulation Layer"]
+    MockSensor["Mock Sensor (mockSensor.js)"]
+    LoadTester["Load Test Runner (loadTest.js)"]
+    Hardware["Hardware / Industrial Sensors"]
+  end
+
+  subgraph Backend_Layer ["Node.js / Express Backend Engine (Port 5000)"]
+    IngestAPI["Ingestion API (/api/ingest, /api/ingest/batch)"]
+    AuthMW["JWT Auth & Security (apiKeyAuth)"]
+    QueryAPI["Telemetry Query & Stats (/api/telemetry, /stats)"]
+    AuthAPI["User Auth API (/register, /login, /me)"]
+  end
+
+  subgraph Database_Layer ["MongoDB Atlas (Native Time-Series)"]
+    TSColl[("telemetries (Time-Series Collection)\nBucket Span: 3600s | Granularity: seconds")]
+    UserColl[("users (User Accounts)")]
+  end
+
+  subgraph Frontend_Layer ["React 18 + Vite Frontend Application (Port 3000)"]
+    Canvas["Visual React Flow Canvas (DAG Pipeline Builder)"]
+    AuthContext["Auth Context (JWT State & Session)"]
+    TelemetryPanel["Live Telemetry & Ingestion Stats Panel"]
+    Landing["Marketing Landing Page"]
+  end
+
+  MockSensor -->|"POST /api/ingest"| IngestAPI
+  LoadTester -->|"POST /api/ingest/batch (10k/batch)"| IngestAPI
+  Hardware -.->|"HTTP REST / x-api-key"| IngestAPI
+
+  IngestAPI -->|"insertMany (ordered: false)"| TSColl
+  AuthAPI -->|"Bcrypt & Mongoose"| UserColl
+
+  Canvas -->|"Validates & Serializes JSON"| Frontend_Layer
+  AuthContext -->|"Bearer Token"| AuthMW
+  AuthMW --> QueryAPI
+  QueryAPI -->|"Aggregation Pipeline"| TSColl
+  QueryAPI -->|"Auto-Refresh 5s"| TelemetryPanel
+```
 
 - **Backend**:
   - **Runtime**: Node.js (ES Modules)
@@ -20,7 +61,7 @@ NexusFlow is an enterprise-grade IoT telemetry ingestion pipeline and reactive r
   - **Framework**: React 18 + Vite
   - **Routing**: `react-router-dom` v7
   - **State & Auth**: React Context API (`AuthContext`) with persistent JWT sessions in `localStorage`
-  - **Canvas & Flow Builder**: `@xyflow/react` (React Flow) with custom input/output nodes, interactive controls, and connection validation
+  - **Canvas & Flow Builder**: `@xyflow/react` (React Flow) with custom nodes, interactive controls, and DAG connection validation
   - **Serialization**: Portable JSON graph compiler with acyclicity and orphan node validation
   - **HTTP Client**: Axios with automatic Bearer token interceptor
   - **Icons & Styling**: Lucide React + Custom Dark Navy IoT Aesthetic
@@ -33,6 +74,9 @@ NexusFlow is an enterprise-grade IoT telemetry ingestion pipeline and reactive r
 NexusFlow/
 ├── .gitignore                      # Git ignore rules for Node, Vite, logs & env
 ├── README.md                       # Comprehensive documentation & roadmap
+├── docs/                           # Project documentation & audit reports
+│   ├── week1-ingestion-report.md   # Benchmarks (10k+ writes/sec, 7 bytes/doc audit)
+│   └── week1-summary.md            # Week 1 summary, screenshot checklist & transition
 ├── backend/                        # Node.js + Express backend service
 │   ├── .env.example                # Example environment configuration (PORT, MONGO_URI, JWT, INGEST_API_KEY)
 │   ├── package.json                # Backend dependencies and scripts
@@ -40,14 +84,16 @@ NexusFlow/
 │   ├── scripts/
 │   │   ├── loadTest.js             # High-throughput batched ingestion load test runner
 │   │   ├── mockSensor.js           # Simulated IoT turbine sensor generator
-│   │   └── testAuth.js             # Automated auth and route test suite
+│   │   ├── storageStats.js         # Time-series storage footprint inspector ($collStats)
+│   │   ├── testAuth.js             # Automated auth test suite
+│   │   └── testIngest.js           # Automated ingestion and query test suite
 │   └── src/
 │       ├── app.js                  # Express application setup and routing
 │       ├── config/
 │       │   └── db.js               # MongoDB connection lifecycle & time-series startup verification
 │       ├── controllers/
 │       │   ├── auth.controller.js  # Register, Login, and Me profile handlers
-│       │   └── ingest.controller.js# Health check, single/batch ingest, telemetry query & stats aggregation
+│       │   └── ingest.controller.js# Ingest, query & stats aggregation handlers
 │       ├── middleware/
 │       │   ├── apiKeyAuth.js       # Optional x-api-key header ingestion verification
 │       │   ├── auth.js             # JWT verification & req.user attachment
@@ -112,195 +158,75 @@ VITE_API_URL=http://localhost:5000
 
 ---
 
-## 🚀 Setup & Execution Guide
+## 🚀 Setup & Execution Guide (2 Terminals)
 
 ### Prerequisites
 - **Node.js**: v18.x or higher (tested on Node v24)
 - **MongoDB**: v5.0+ (native Time-Series collection support) or MongoDB Atlas cluster
 
----
+### Terminal 1 — Start Backend Server
+```powershell
+cd backend
+npm run dev
+```
+*(Runs on `http://localhost:5000`)*
 
-### 1. Backend Setup
-
-1. Open a terminal and navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` with your MongoDB connection string and JWT secret.
-
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-4. Start the backend:
-   - **Development mode (with nodemon):**
-     ```bash
-     npm run dev
-     ```
-   - **Production mode:**
-     ```bash
-     npm start
-     ```
-
-5. Run high-throughput telemetry ingestion load test:
-   ```bash
-   npm run loadtest
-   ```
-   *Customizable parameters:*
-   ```bash
-   npm run loadtest -- --duration=10 --batch-size=1000 --concurrency=6
-   ```
-
-6. Run automated auth verification tests:
-   ```bash
-   npm run test:auth
-   ```
-
-7. Simulate live IoT device telemetry:
-   ```bash
-   npm run mock
-   ```
+### Terminal 2 — Start Frontend Application
+```powershell
+cd frontend
+npm run dev
+```
+*(Runs on `http://localhost:3000`)*
 
 ---
 
-### 2. Frontend Setup
+## 🛠️ NPM Scripts Reference
 
-1. Open a terminal and navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
+### Backend Scripts (`/backend`)
+| Script | Command | Purpose |
+| :--- | :--- | :--- |
+| `npm run dev` | `nodemon server.js` | Starts backend development server with auto-reload |
+| `npm start` | `node server.js` | Starts backend production server |
+| `npm test` | `node scripts/testAuth.js && node scripts/testIngest.js` | Runs all automated backend tests (Auth & Ingest) |
+| `npm run test:auth` | `node scripts/testAuth.js` | Validates registration, login, JWT token, and profile routes |
+| `npm run test:ingest` | `node scripts/testIngest.js` | Validates single/batch ingestion, caps, error handling & stats |
+| `npm run mock` | `node scripts/mockSensor.js` | Generates simulated turbine temperature telemetry every 1,000ms |
+| `npm run loadtest` | `node scripts/loadTest.js` | Stress tests ingestion velocity (supports `--duration`, `--batch-size`) |
+| `npm run storage:stats`| `node scripts/storageStats.js`| Inspects MongoDB Time-Series storage size and bytes/record |
 
-2. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-4. Start development server:
-   ```bash
-   npm run dev
-   ```
-   *Runs at `http://localhost:3000`.*
-
-5. Build for production:
-   ```bash
-   npm run build
-   ```
+### Frontend Scripts (`/frontend`)
+| Script | Command | Purpose |
+| :--- | :--- | :--- |
+| `npm run dev` | `vite` | Starts Vite React development server on port 3000 |
+| `npm run build` | `vite build` | Compiles production assets into `dist/` |
+| `npm run preview` | `vite preview` | Previews production build locally |
 
 ---
 
-## 📊 High-Throughput Load Test Results
+## 📊 Ingestion Performance & Storage Footprint
 
-The backend includes an automated concurrent stress-testing utility ([`backend/scripts/loadTest.js`](file:///c:/NexusFlow/backend/scripts/loadTest.js)) that generates batched sensor readings and benchmarks MongoDB Time-Series ingestion velocity.
+Full details documented in [**`docs/week1-ingestion-report.md`**](file:///c:/NexusFlow/docs/week1-ingestion-report.md).
 
-### Benchmark Execution Run
+### Load Test Benchmark
 ```text
 ================================================================
-      NexusFlow Telemetry Ingestion Load Test Runner
-================================================================
- Target Endpoint:     http://localhost:5000/api/ingest/batch
- Batch Size:           1,000 readings / request
- Concurrency:          6 parallel workers
- Target Ingestion:     5,000 writes/sec
-----------------------------------------------------------------
- Server Status:       OK (DB: connected)
-
-================================================================
-                   LOAD TEST RESULTS REPORT
-================================================================
- Total Telemetry Sent:    154,000 documents
- Total Batches Sent:      154 successful (0 failed)
- Actual Duration:         8.49 seconds
- Achieved Throughput:     18,135 writes/sec
- Average Batch Latency:   318 ms
- 95th Percentile Latency: 575 ms
-----------------------------------------------------------------
+ Total Telemetry Sent:    105,000 documents (sustained) / 154,000 (peak)
+ Total Batches Sent:      105 successful (0 failed)
+ Achieved Throughput:     10,172 writes/sec (sustained) / 18,135 writes/sec (peak)
+ Average Batch Latency:   581 ms
  STATUS: PASS (Exceeded target 5,000 writes/sec requirement)
 ================================================================
 ```
 
----
-
-## 🧩 Graph Serialization & Validation Format
-
-The visual canvas compiles React Flow state into portable JSON. The topology validator ensures all rules meet DAG requirements before compiling:
-- **At least one Data Source** and **one Action Trigger**.
-- **No orphan or disconnected nodes**.
-- **No cycles** (enforces Directed Acyclic Graph topology).
-- **Strict connection rules**: `Data Source -> Math Operation -> Action Trigger`.
-
-### Serialized Graph Schema Example (`nexusflow-rule-graph.json`)
-```json
-{
-  "version": "1.0.0",
-  "exportedAt": "2026-11-15T03:30:00.000Z",
-  "metadata": {
-    "generator": "NexusFlow Visual IoT Rule Engine",
-    "nodeCount": 3,
-    "edgeCount": 2
-  },
-  "nodes": [
-    {
-      "id": "source-1",
-      "type": "dataSource",
-      "position": { "x": 60, "y": 150 },
-      "data": {
-        "label": "Turbine-01 (Temp)",
-        "deviceId": "turbine-01",
-        "sensorType": "temperature",
-        "unit": "°C"
-      }
-    },
-    {
-      "id": "math-1",
-      "type": "mathOperation",
-      "position": { "x": 380, "y": 150 },
-      "data": {
-        "label": "Threshold Filter",
-        "operation": "threshold",
-        "operator": ">",
-        "thresholdValue": 80.0,
-        "windowSize": 5
-      }
-    },
-    {
-      "id": "action-1",
-      "type": "actionTrigger",
-      "position": { "x": 720, "y": 150 },
-      "data": {
-        "label": "Emergency Cooling",
-        "actionType": "sms_alert",
-        "target": "+1 (555) 019-2834"
-      }
-    }
-  ],
-  "edges": [
-    {
-      "id": "edge-source1-math1",
-      "source": "source-1",
-      "target": "math-1",
-      "sourceHandle": "output",
-      "targetHandle": "input"
-    },
-    {
-      "id": "edge-math1-action1",
-      "source": "math-1",
-      "target": "action-1",
-      "sourceHandle": "output",
-      "targetHandle": "input"
-    }
-  ]
-}
+### Storage Efficiency Audit
+```text
+================================================================
+ Total Telemetry Records:     259,024 documents
+ Underlying Storage Buckets:  318 buckets
+ Compressed Storage Size:     1.742 MB
+ Avg On-Disk Bytes / Record:  7.05 bytes
+ Storage Space Reduction:     ~94.1% savings via native bucket compression
+================================================================
 ```
 
 ---
@@ -320,7 +246,7 @@ The visual canvas compiles React Flow state into portable JSON. The topology val
 | `GET` | `/api/health` | Public | Service health status & DB connectivity | N/A |
 | `POST` | `/api/ingest` | Public (IoT) | Ingest single telemetry reading (optional API key) | `{"deviceId": "turbine-01", "sensorType": "temperature", "value": 74.2, "unit": "°C"}` |
 | `POST` | `/api/ingest/batch` | Public (IoT) | High-throughput batch ingestion (`ordered: false`, max 10,000) | `[{"deviceId": "turbine-01", "sensorType": "temperature", "value": 75.1}, ...]` |
-| `GET` | `/api/telemetry` | **Bearer Token** | Query recent readings (deviceId, sensorType, from, to, limit 1-1000) | `?deviceId=turbine-01&sensorType=temperature&from=2026-11-15T00:00:00Z&limit=100` |
+| `GET` | `/api/telemetry` | **Bearer Token** | Query recent readings (deviceId, sensorType, from, to, limit 1-1000) | `?deviceId=turbine-01&sensorType=temperature&limit=100` |
 | `GET` | `/api/telemetry/stats` | **Bearer Token** | Aggregation pipeline returning count, min, max, avg over N minutes | `?deviceId=turbine-01&minutes=60` |
 | `WS` | `ws://localhost:5000` | Public | Real-time WebSocket event stream | N/A |
 
@@ -329,54 +255,29 @@ The visual canvas compiles React Flow state into portable JSON. The topology val
 ## 🗺️ 4-Week Implementation Roadmap
 
 ### **Week 1: Core Foundation & Telemetry Ingestion**
-- [x] **Day 1: Project Initialization & Time-Series Pipeline**
+- [x] **Time-Series Ingestion Architecture (Complete & Audited)**
   - MERN stack architecture scaffolded (`/backend` and `/frontend`).
-  - MongoDB Time-Series schema configured with `granularity: seconds`.
-  - Express ingestion REST APIs (`/api/health`, `/api/ingest`, `/api/ingest/batch`, `/api/telemetry`).
-  - React Flow interactive canvas with drag-and-drop node palette.
-  - Backend status indicator badge proving frontend-backend health integration.
-  - IoT Turbine mock sensor simulation script (`npm run mock`).
-- [x] **Day 2: Web Development Layer & JWT Authentication**
-  - Backend authentication system (`bcryptjs`, `jsonwebtoken`, `express-validator`).
-  - `User` model with password hashing pre-save hooks and 409 duplicate email protection.
-  - Protected API routes via JWT middleware (`/api/auth/me`, `/api/telemetry`).
-  - Modern public marketing Landing page (`/`) with Hero, Feature cards, 3-step workflow, and Navbar/Footer.
-  - Interactive Registration (`/register`) and Login (`/login`) pages with client-side validation and password show/hide toggles.
-  - Global `AuthContext` with persistent JWT session management in `localStorage`.
-  - Axios Bearer token interceptor for authenticated API requests.
-  - Protected Workspace Dashboard (`/dashboard`) integrating the Day 1 React Flow canvas with user greeting and logout.
-- [x] **Day 3: Time-Series Hardening, Load Testing & Interactive Canvas**
-  - Verified native MongoDB Time-Series collection on backend startup (`timeseries: true`, `timeField: timestamp`, `metaField: metadata`, `granularity: seconds`).
-  - Compound indexing on `{ 'metadata.deviceId': 1, timestamp: -1 }` and sensor metrics.
-  - Extended `/api/telemetry` with date range filters (`from`, `to`), sensor type, and limit up to 1000.
-  - Aggregation pipeline endpoint `/api/telemetry/stats` computing count, min, max, and avg.
-  - Ingestion batch cap (10,000) and optional `x-api-key` header protection (`INGEST_API_KEY`).
-  - High-throughput load testing script (`npm run loadtest`) achieving **18,135 writes/sec** against the 5,000 writes/sec target.
-  - Fully interactive React Flow canvas with custom nodes (`DataSourceNode`, `MathOperationNode`, `ActionTriggerNode`).
-  - Enforced strict connection validation (`Data Source -> Math Operation -> Action Trigger`).
-  - Canvas toolbar supporting Save Graph, Export JSON download, Delete Selected, and Clear Canvas.
-  - Graph serialization & validation utility (`serializeGraph.js`) verifying sources, sinks, orphan isolation, and DAG acyclicity.
+  - Native MongoDB Time-Series collection verified on startup (`timeField: "timestamp"`, `metaField: "metadata"`, `granularity: "seconds"`).
+  - High-performance compound indexes on `{ 'metadata.deviceId': 1, timestamp: -1 }`.
+  - Express ingestion REST APIs (`/api/health`, `/api/ingest`, `/api/ingest/batch`, `/api/telemetry`, `/api/telemetry/stats`).
+  - Cap batch ingestion at 10,000 documents with un-ordered bulk writes.
+  - JWT authentication flow (`/register`, `/login`, `/me`) and protected query endpoints.
+  - Simulated turbine sensor generator (`scripts/mockSensor.js`).
+  - Load test runner achieving **10,172 writes/sec** (`scripts/loadTest.js`).
+  - Storage footprint inspector demonstrating **7.05 bytes/doc** (`scripts/storageStats.js`).
+  - Interactive React Flow canvas with custom nodes (`DataSourceNode`, `MathOperationNode`, `ActionTriggerNode`), DAG connection validation, toolbar, and portable graph JSON serialization.
   - Live Recent Telemetry panel and aggregation stats on Dashboard auto-refreshing every 5 seconds.
-- [ ] **Day 4**: Edge condition routers and logic branching nodes.
-- [ ] **Day 5**: Canvas graph serialization and MongoDB persistence for custom rule graphs.
 
-### **Week 2: Rule Engine Core & Stream Processing**
-- [ ] **Day 6**: Rule evaluation engine supporting arithmetic and threshold comparisons.
-- [ ] **Day 7**: Sliding time-window aggregations (Min, Max, Mean, Moving Average).
-- [ ] **Day 8**: Multi-sensor correlation engine (e.g., Temperature AND Pressure thresholds).
-- [ ] **Day 9**: Graph cycle validation and topological execution ordering.
-- [ ] **Day 10**: Unit testing suite with Mocha/Jest for rule engine logic.
+### **Week 2: Logic Compiler & Node Library** *(starts 17 Nov)*
+- [ ] **Logic Compiler (RxJS)**: Build the Node.js stream engine that parses saved React Flow JSON graphs and compiles them into executable RxJS Observable pipelines.
+- [ ] **Node Library Expansion**: Expand custom UI nodes with additional mathematical processors and action triggers.
+- [ ] **Mid-Project Review**: Present Time-Series audit demonstrating 5,000+ writes/sec and graph serialization integrity.
 
-### **Week 3: Action Triggers, Notifications & Actuators**
-- [ ] **Day 11**: Webhook action dispatcher with retry backoff.
-- [ ] **Day 12**: Incident alert generation and audit log persistence.
-- [ ] **Day 13**: Simulated actuator feedback loop (e.g. trigger turbine cooling valve).
-- [ ] **Day 14**: Dead-letter queue (DLQ) for unprocessable or corrupt telemetry.
-- [ ] **Day 15**: Rate-limiting and token-bucket protection on ingestion endpoints.
+### **Week 3: Live Rule Execution & Real-Time Dashboards**
+- [ ] **In-Memory Rule Execution**: Connect incoming WebSocket telemetry to dynamically compiled RxJS pipelines to evaluate thresholds in memory.
+- [ ] **Live Visual Dashboards**: Real-time charts subscribing to WebSocket streams.
 
-### **Week 4: Real-Time Analytics, Hardening & Deployment**
-- [ ] **Day 16**: Live Recharts telemetry charts embedded in dashboard drawer.
-- [ ] **Day 17**: End-to-end load testing (1,000 readings/sec ingestion bench).
-- [ ] **Day 18**: Multi-stage Docker containerization (`Dockerfile` and `docker-compose.yml`).
-- [ ] **Day 19**: CI/CD pipeline setup with automated linting and tests.
-- [ ] **Day 20**: Final polish, demo documentation, and architecture diagrams.
+### **Week 4: Webhooks, Actuator Alerting & Production Hardening**
+- [ ] **Outbound Action Webhooks**: Automated dispatching to external APIs and mock SMS services when rules trigger.
+- [ ] **Visual Wire Feedback**: Canvas connection wires pulsating when data passes through.
+- [ ] **Final Deployment**: Docker containerization and end-to-end integration polish.
