@@ -1,6 +1,6 @@
 import React from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import { Cpu, Activity } from 'lucide-react';
+import { Cpu, Activity, Calculator, Filter, Sigma, TrendingDown, TrendingUp } from 'lucide-react';
 
 export default function MathOperationNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
@@ -23,7 +23,7 @@ export default function MathOperationNode({ id, data, isConnectable }) {
   };
 
   const handleWindowChange = (e) => {
-    updateNodeData(id, { ...data, windowSize: parseInt(e.target.value, 10) || 1 });
+    updateNodeData(id, { ...data, windowSize: Math.max(1, parseInt(e.target.value, 10) || 1) });
   };
 
   return (
@@ -47,8 +47,10 @@ export default function MathOperationNode({ id, data, isConnectable }) {
           <label>Operation Type</label>
           <select value={operation} onChange={handleOpChange} className="node-select">
             <option value="threshold">Threshold Filter</option>
-            <option value="moving_average">Moving Average Window</option>
-            <option value="sum">Cumulative Sum</option>
+            <option value="moving_average">Moving Average (Window)</option>
+            <option value="sum">Sum Accumulator</option>
+            <option value="min">Min Tracker</option>
+            <option value="max">Max Tracker</option>
           </select>
         </div>
 
@@ -81,7 +83,7 @@ export default function MathOperationNode({ id, data, isConnectable }) {
             <label>Window Size (samples)</label>
             <input
               type="number"
-              min="2"
+              min="1"
               max="100"
               value={windowSize}
               onChange={handleWindowChange}
@@ -90,12 +92,53 @@ export default function MathOperationNode({ id, data, isConnectable }) {
           </div>
         )}
 
-        {operation === 'sum' && (
-          <div className="node-status-bar">
-            <Activity size={12} className="text-purple" />
-            <span>Cumulative Accumulator</span>
+        {(operation === 'sum' || operation === 'min' || operation === 'max') && (
+          <div className="node-config-field">
+            <label>Rolling Window (samples)</label>
+            <input
+              type="number"
+              min="1"
+              max="500"
+              value={windowSize}
+              onChange={handleWindowChange}
+              className="node-input"
+              placeholder="e.g. 10 (or blank for cumulative)"
+            />
           </div>
         )}
+
+        <div className="node-status-bar">
+          {operation === 'threshold' && (
+            <>
+              <Filter size={12} className="text-purple" />
+              <span>Pass when value {operator} {thresholdValue}</span>
+            </>
+          )}
+          {operation === 'moving_average' && (
+            <>
+              <Calculator size={12} className="text-purple" />
+              <span>Rolling Mean (N = {windowSize})</span>
+            </>
+          )}
+          {operation === 'sum' && (
+            <>
+              <Sigma size={12} className="text-purple" />
+              <span>Sum Accumulator (N = {windowSize})</span>
+            </>
+          )}
+          {operation === 'min' && (
+            <>
+              <TrendingDown size={12} className="text-purple" />
+              <span>Min Value Window (N = {windowSize})</span>
+            </>
+          )}
+          {operation === 'max' && (
+            <>
+              <TrendingUp size={12} className="text-purple" />
+              <span>Max Value Window (N = {windowSize})</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Output handle on the right */}

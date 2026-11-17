@@ -15,10 +15,11 @@ export default function DataSourceNode({ id, data, isConnectable }) {
 
   const handleSensorChange = (e) => {
     const newSensor = e.target.value;
-    let newUnit = '°C';
-    if (newSensor === 'vibration') newUnit = 'mm/s';
-    if (newSensor === 'pressure') newUnit = 'bar';
-    if (newSensor === 'power') newUnit = 'kW';
+    let newUnit = unit;
+    if (newSensor === 'temperature') newUnit = '°C';
+    else if (newSensor === 'vibration') newUnit = 'mm/s';
+    else if (newSensor === 'pressure') newUnit = 'bar';
+    else if (newSensor === 'power') newUnit = 'kW';
     updateNodeData(id, { ...data, sensorType: newSensor, unit: newUnit });
   };
 
@@ -31,14 +32,14 @@ export default function DataSourceNode({ id, data, isConnectable }) {
 
       <div className="flow-node-body">
         <div className="node-config-field">
-          <label>Target Device</label>
-          <select value={deviceId} onChange={handleDeviceChange} className="node-select">
-            <option value="turbine-01">Turbine-01 (Primary)</option>
-            <option value="turbine-02">Turbine-02 (Auxiliary)</option>
-            <option value="compressor-03">Compressor-03</option>
-            <option value="generator-04">Generator-04</option>
-            <option value="pump-05">Water Pump-05</option>
-          </select>
+          <label>Target Device ID</label>
+          <input
+            type="text"
+            value={deviceId}
+            onChange={handleDeviceChange}
+            className="node-input"
+            placeholder="e.g. turbine-01"
+          />
         </div>
 
         <div className="node-config-field">
@@ -48,16 +49,18 @@ export default function DataSourceNode({ id, data, isConnectable }) {
             <option value="vibration">Vibration (mm/s)</option>
             <option value="pressure">Pressure (bar)</option>
             <option value="power">Power Output (kW)</option>
+            <option value="humidity">Humidity (%)</option>
+            <option value="voltage">Voltage (V)</option>
           </select>
         </div>
 
         <div className="node-status-bar">
           <Radio size={12} className="pulse-icon text-cyan" />
-          <span>Active Ingest Stream</span>
+          <span>Stream: {deviceId} ({sensorType})</span>
         </div>
       </div>
 
-      {/* Output handle only */}
+      {/* Output handle only (right) */}
       <Handle
         type="source"
         position={Position.Right}

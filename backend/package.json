@@ -8,9 +8,11 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "mock": "node scripts/mockSensor.js",
-    "test": "node scripts/testAuth.js && node scripts/testIngest.js",
+    "test": "node scripts/testAuth.js && node scripts/testIngest.js && node scripts/testWeek2Compiler.js && node --test tests/compiler.test.js",
     "test:auth": "node scripts/testAuth.js",
     "test:ingest": "node scripts/testIngest.js",
+    "test:compiler": "node --test tests/compiler.test.js",
+    "test:graph": "node scripts/testWeek2Compiler.js",
     "loadtest": "node scripts/loadTest.js",
     "storage:stats": "node scripts/storageStats.js"
   },
@@ -22,6 +24,7 @@
     "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
+    "rxjs": "^7.8.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {

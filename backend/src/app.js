@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import ingestRoutes from './routes/ingest.routes.js';
+import graphRoutes from './routes/graph.routes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -46,13 +47,17 @@ app.get('/', (req, res) => {
       ingestBatch: 'POST /api/ingest/batch',
       telemetry: 'GET /api/telemetry?deviceId=&sensorType=&from=&to=&limit= (Protected)',
       telemetryStats: 'GET /api/telemetry/stats?deviceId=&minutes= (Protected)',
+      graphs: 'GET,POST /api/graphs (Protected)',
+      graphDetail: 'GET,PUT,DELETE /api/graphs/:id (Protected)',
+      graphCompile: 'POST /api/graphs/:id/compile (Protected)',
     },
   });
 });
 
-// Auth and Ingestion routes
+// Auth, Ingestion, and Rule Graph routes
 app.use('/api/auth', authRoutes);
 app.use('/api', ingestRoutes);
+app.use('/api/graphs', graphRoutes);
 
 // Error handling
 app.use(notFoundHandler);

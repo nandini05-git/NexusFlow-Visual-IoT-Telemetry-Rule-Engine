@@ -1,5 +1,6 @@
 import Telemetry from '../models/Telemetry.js';
 import { getDBStatus } from '../config/db.js';
+import { telemetryBus } from '../compiler/telemetryBus.js';
 
 const MAX_BATCH_SIZE = 10000;
 
@@ -61,6 +62,9 @@ export const ingestSingle = async (req, res, next) => {
 
     const reading = new Telemetry(normalized);
     const saved = await reading.save();
+
+    // Pipe reading to RxJS telemetryBus
+    telemetryBus.next(saved.toObject ? saved.toObject() : saved);
 
     // Broadcast if WebSocket server is attached to req.app
     const broadcastTelemetry = req.app.get('broadcastTelemetry');
@@ -139,6 +143,13 @@ export const ingestBatch = async (req, res, next) => {
       } else {
         throw bulkError;
       }
+    }
+
+    // Pipe batch readings to RxJS telemetryBus
+    if (Array.isArray(inserted)) {
+      inserted.forEach((doc) => {
+        telemetryBus.next(doc.toObject ? doc.toObject() : doc);
+      });
     }
 
     const broadcastTelemetry = req.app.get('broadcastTelemetry');

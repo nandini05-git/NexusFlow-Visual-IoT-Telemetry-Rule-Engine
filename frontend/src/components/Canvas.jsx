@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -11,10 +11,16 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import DataSourceNode from './nodes/DataSourceNode';
-import MathOperationNode from './nodes/MathOperationNode';
-import ActionTriggerNode from './nodes/ActionTriggerNode';
+import { nodeTypes } from './nodes/nodeRegistry';
 import { validateGraph, serializeGraph, downloadGraphJson } from '../utils/serializeGraph';
+import {
+  fetchUserGraphs,
+  fetchGraphById,
+  createRuleGraph,
+  updateRuleGraph,
+  compileSavedGraph,
+  compileAdHocGraph,
+} from '../api/graphs';
 import {
   Save,
   Download,
@@ -26,16 +32,13 @@ import {
   Check,
   X,
   Code2,
-  Layers,
   ZoomIn,
+  PlayCircle,
+  FolderOpen,
+  FileCheck,
+  Loader2,
+  Activity,
 } from 'lucide-react';
-
-// Defined outside component to prevent re-render loops in React Flow
-const nodeTypes = {
-  dataSource: DataSourceNode,
-  mathOperation: MathOperationNode,
-  actionTrigger: ActionTriggerNode,
-};
 
 const defaultInitialNodes = [
   {
@@ -69,6 +72,7 @@ const defaultInitialNodes = [
       label: 'Emergency Cooling',
       actionType: 'sms_alert',
       target: '+1 (555) 019-2834',
+      template: 'ALERT: Turbine-01 overheat ({{value}}°C)',
     },
   },
 ];
@@ -103,12 +107,43 @@ function CanvasInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(defaultInitialEdges);
   const { screenToFlowPosition, getNode, getNodes, getEdges, fitView } = useReactFlow();
 
-  // Serialization and validation UI state
+  // Rule Graph Persistence State
+  const [graphName, setGraphName] = useState('Turbine Overheat Rule');
+  const [currentGraphId, setCurrentGraphId] = useState(null);
+  const [savedGraphs, setSavedGraphs] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
+
+  // Notifications & Modals
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
   const [validationResult, setValidationResult] = useState(null);
+  const [compileResult, setCompileResult] = useState(null);
   const [savedJsonData, setSavedJsonData] = useState(null);
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [showCompileModal, setShowCompileModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connectionNotice, setConnectionNotice] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Load user saved graphs on mount
+  const loadSavedGraphsList = useCallback(async () => {
+    try {
+      const res = await fetchUserGraphs();
+      if (res.success && Array.isArray(res.data)) {
+        setSavedGraphs(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load user saved graphs (offline or unauthorized):', err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSavedGraphsList();
+  }, [loadSavedGraphsList]);
 
   /**
    * Validate connections:
@@ -117,24 +152,23 @@ function CanvasInner() {
    */
   const isValidConnection = useCallback(
     (connection) => {
-      // 1. Block self connection
       if (connection.source === connection.target) return false;
 
       const sourceNode = getNode(connection.source);
       const targetNode = getNode(connection.target);
       if (!sourceNode || !targetNode) return false;
 
-      // 2. Data Source must connect to Math Operation or Action Trigger
+      // Data Source must connect to Math Operation or Action Trigger
       if (sourceNode.type === 'dataSource') {
         return targetNode.type === 'mathOperation' || targetNode.type === 'actionTrigger';
       }
 
-      // 3. Math Operation can connect to another Math Operation or Action Trigger
+      // Math Operation can connect to another Math Operation or Action Trigger
       if (sourceNode.type === 'mathOperation') {
         return targetNode.type === 'mathOperation' || targetNode.type === 'actionTrigger';
       }
 
-      // 4. Action Trigger has no outputs
+      // Action Trigger has no outputs
       if (sourceNode.type === 'actionTrigger') {
         return false;
       }
@@ -191,30 +225,8 @@ function CanvasInner() {
           label: `${nodeInfo.label} #${nodes.length + 1}`,
           category: nodeInfo.category,
           type: nodeInfo.type,
+          ...(nodeInfo.defaultData || {}),
         };
-
-        if (nodeInfo.type === 'dataSource') {
-          initialData = {
-            ...initialData,
-            deviceId: 'turbine-01',
-            sensorType: 'temperature',
-            unit: '°C',
-          };
-        } else if (nodeInfo.type === 'mathOperation') {
-          initialData = {
-            ...initialData,
-            operation: 'threshold',
-            operator: '>',
-            thresholdValue: 80,
-            windowSize: 5,
-          };
-        } else if (nodeInfo.type === 'actionTrigger') {
-          initialData = {
-            ...initialData,
-            actionType: 'sms_alert',
-            target: '+1 (555) 019-2834',
-          };
-        }
 
         const newNode = {
           id: newNodeId,
@@ -242,8 +254,11 @@ function CanvasInner() {
     if (window.confirm('Are you sure you want to clear the canvas? All unsaved nodes and connections will be removed.')) {
       setNodes([]);
       setEdges([]);
+      setCurrentGraphId(null);
+      setGraphName('Untitled Rule');
       setValidationResult(null);
       setSavedJsonData(null);
+      setCompileResult(null);
     }
   }, [setNodes, setEdges]);
 
@@ -251,21 +266,134 @@ function CanvasInner() {
   const handleResetSample = useCallback(() => {
     setNodes(defaultInitialNodes);
     setEdges(defaultInitialEdges);
+    setGraphName('Turbine Overheat Rule');
+    setCurrentGraphId(null);
     setValidationResult(null);
+    setCompileResult(null);
     setTimeout(() => fitView({ padding: 0.2 }), 50);
   }, [setNodes, setEdges, fitView]);
 
-  // Save and Validate Graph
-  const handleSaveGraph = useCallback(() => {
+  // Save Graph to Backend Server (POST /api/graphs or PUT /api/graphs/:id)
+  const handleSaveToServer = useCallback(async () => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     const result = validateGraph(currentNodes, currentEdges);
     setValidationResult(result);
 
-    if (result.isValid) {
-      setSavedJsonData(result.data);
-      setShowJsonModal(true);
+    if (!result.isValid) {
+      showToast('error', `Cannot save: ${result.errors[0]}`);
+      return;
     }
+
+    const serialized = serializeGraph(currentNodes, currentEdges);
+    setIsSaving(true);
+
+    try {
+      if (currentGraphId) {
+        // Update existing graph
+        const res = await updateRuleGraph(currentGraphId, {
+          name: graphName.trim() || 'Untitled Rule',
+          graph: serialized,
+        });
+        showToast('success', `Graph '${res.data.name}' updated on server!`);
+      } else {
+        // Create new graph
+        const res = await createRuleGraph({
+          name: graphName.trim() || 'Untitled Rule',
+          graph: serialized,
+          status: 'draft',
+        });
+        setCurrentGraphId(res.data._id);
+        showToast('success', `Graph '${res.data.name}' saved to server!`);
+      }
+      loadSavedGraphsList();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      showToast('error', `Save failed: ${msg}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [getNodes, getEdges, currentGraphId, graphName, loadSavedGraphsList]);
+
+  // Load Graph from Dropdown selection
+  const handleSelectGraph = useCallback(
+    async (e) => {
+      const selectedId = e.target.value;
+      if (!selectedId) {
+        handleResetSample();
+        return;
+      }
+
+      try {
+        const res = await fetchGraphById(selectedId);
+        if (res.success && res.data) {
+          const doc = res.data;
+          setGraphName(doc.name);
+          setCurrentGraphId(doc._id);
+          if (doc.graph && Array.isArray(doc.graph.nodes)) {
+            setNodes(doc.graph.nodes);
+            setEdges(doc.graph.edges || []);
+            setValidationResult(null);
+            setCompileResult(null);
+            setTimeout(() => fitView({ padding: 0.2 }), 50);
+            showToast('success', `Loaded '${doc.name}'`);
+          }
+        }
+      } catch (err) {
+        showToast('error', `Failed to load graph: ${err.message}`);
+      }
+    },
+    [setNodes, setEdges, fitView, handleResetSample]
+  );
+
+  // Compile Check: Dry-run compiles via POST /api/graphs/:id/compile or POST /api/graphs/compile
+  const handleCompileCheck = useCallback(async () => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    const clientValidation = validateGraph(currentNodes, currentEdges);
+
+    if (!clientValidation.isValid) {
+      setValidationResult(clientValidation);
+      showToast('error', `Compiler Check Failed: ${clientValidation.errors[0]}`);
+      return;
+    }
+
+    setIsCompiling(true);
+    const serialized = serializeGraph(currentNodes, currentEdges);
+
+    try {
+      let res;
+      if (currentGraphId) {
+        // Compile saved graph
+        res = await compileSavedGraph(currentGraphId);
+      } else {
+        // Compile current canvas graph ad-hoc
+        res = await compileAdHocGraph({
+          name: graphName.trim() || 'Canvas Rule',
+          graph: serialized,
+        });
+      }
+
+      setCompileResult(res);
+      setShowCompileModal(true);
+      showToast('success', 'Logic Compiler: Graph successfully compiled into RxJS streams!');
+    } catch (err) {
+      const errData = err.response?.data;
+      const errorList = errData?.errors || [errData?.message || err.message];
+      setValidationResult({ isValid: false, errors: errorList });
+      showToast('error', `Compilation Error: ${errorList[0]}`);
+    } finally {
+      setIsCompiling(false);
+    }
+  }, [getNodes, getEdges, currentGraphId, graphName]);
+
+  // Inspect Serialized JSON
+  const handleInspectJson = useCallback(() => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    const serialized = serializeGraph(currentNodes, currentEdges);
+    setSavedJsonData(serialized);
+    setShowJsonModal(true);
   }, [getNodes, getEdges]);
 
   // Export JSON file download
@@ -273,8 +401,8 @@ function CanvasInner() {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     const serialized = serializeGraph(currentNodes, currentEdges);
-    downloadGraphJson(serialized, `nexusflow-graph-${Date.now()}.json`);
-  }, [getNodes, getEdges]);
+    downloadGraphJson(serialized, `${graphName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.json`);
+  }, [getNodes, getEdges, graphName]);
 
   const copyToClipboard = () => {
     if (savedJsonData) {
@@ -286,32 +414,90 @@ function CanvasInner() {
 
   return (
     <div className="canvas-wrapper" ref={reactFlowWrapper}>
+      {/* Toast Notification Banner */}
+      {toast && (
+        <div className={`canvas-toast-banner ${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="notice-close">×</button>
+        </div>
+      )}
+
       {/* Canvas Top Toolbar */}
       <div className="canvas-toolbar">
         <div className="toolbar-left">
-          <button onClick={handleSaveGraph} className="toolbar-btn btn-save" title="Validate & Save Graph">
-            <Save size={15} />
-            <span>Save Graph</span>
+          {/* Rule Name Input */}
+          <input
+            type="text"
+            value={graphName}
+            onChange={(e) => setGraphName(e.target.value)}
+            className="toolbar-name-input"
+            title="Graph / Rule Name"
+            placeholder="Untitled Rule"
+          />
+
+          {/* Load Graph Dropdown */}
+          <select
+            value={currentGraphId || ''}
+            onChange={handleSelectGraph}
+            className="toolbar-select"
+            title="Load saved user graph"
+          >
+            <option value="">-- Load Saved Graph --</option>
+            {savedGraphs.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.name} ({new Date(g.updatedAt).toLocaleDateString()})
+              </option>
+            ))}
+          </select>
+
+          {/* Save to Server */}
+          <button
+            onClick={handleSaveToServer}
+            disabled={isSaving}
+            className="toolbar-btn btn-save"
+            title="Save or Update graph on server"
+          >
+            {isSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+            <span>{currentGraphId ? 'Update Server' : 'Save to Server'}</span>
           </button>
-          <button onClick={handleExportJson} className="toolbar-btn btn-export" title="Export as JSON file">
-            <Download size={15} />
-            <span>Export JSON</span>
+
+          {/* Compile Check */}
+          <button
+            onClick={handleCompileCheck}
+            disabled={isCompiling}
+            className="toolbar-btn btn-compile"
+            title="Dry-run compile into executable RxJS streams"
+          >
+            {isCompiling ? <Loader2 size={14} className="spin" /> : <PlayCircle size={14} />}
+            <span>Compile Check</span>
           </button>
+
           <div className="toolbar-divider" />
-          <button onClick={handleDeleteSelected} className="toolbar-btn btn-delete" title="Delete selected nodes or edges">
-            <Trash2 size={15} />
-            <span>Delete Selected</span>
+
+          {/* Inspect / Export JSON */}
+          <button onClick={handleInspectJson} className="toolbar-btn btn-export" title="Inspect Serialized JSON">
+            <Code2 size={14} />
+            <span>Inspect JSON</span>
           </button>
-          <button onClick={handleClearCanvas} className="toolbar-btn btn-clear" title="Clear all nodes on canvas">
-            <X size={15} />
-            <span>Clear Canvas</span>
+          <button onClick={handleExportJson} className="toolbar-btn" title="Download JSON file">
+            <Download size={14} />
+            <span>Export</span>
           </button>
         </div>
 
         <div className="toolbar-right">
+          <button onClick={handleDeleteSelected} className="toolbar-btn btn-delete" title="Delete selected nodes or edges">
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+          <button onClick={handleClearCanvas} className="toolbar-btn btn-clear" title="Clear all nodes on canvas">
+            <X size={14} />
+            <span>Clear</span>
+          </button>
           <button onClick={handleResetSample} className="toolbar-btn btn-sample" title="Load sample turbine pipeline">
             <RefreshCw size={14} />
-            <span>Load Sample</span>
+            <span>Sample</span>
           </button>
           <button onClick={() => fitView({ padding: 0.2 })} className="toolbar-btn btn-fit" title="Fit view to canvas">
             <ZoomIn size={14} />
@@ -372,6 +558,47 @@ function CanvasInner() {
         />
         <Background color="#334155" gap={20} size={1.2} />
       </ReactFlow>
+
+      {/* Compiler Result Modal */}
+      {showCompileModal && compileResult && (
+        <div className="modal-backdrop" onClick={() => setShowCompileModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <CheckCircle2 size={18} className="text-green" />
+                <h3>RxJS Logic Compiler: Success</h3>
+              </div>
+              <button onClick={() => setShowCompileModal(false)} className="modal-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="modal-desc">
+              The DAG was parsed, topologically sorted, and converted into reactive RxJS streams with branching via <code>.pipe(share())</code>.
+            </p>
+
+            <div className="json-preview-container">
+              <div className="json-preview-bar">
+                <div className="json-badge">
+                  <Activity size={13} />
+                  <span>
+                    Pipeline: {compileResult.metadata?.nodeCount} Nodes • {compileResult.metadata?.edgeCount} Edges • {compileResult.metadata?.dataSources?.length} Inputs • {compileResult.metadata?.actionTriggers?.length} Sinks
+                  </span>
+                </div>
+              </div>
+              <pre className="json-code-block">
+                {JSON.stringify(compileResult.metadata, null, 2)}
+              </pre>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setShowCompileModal(false)} className="btn-modal-close">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Serialized JSON Graph Modal */}
       {showJsonModal && savedJsonData && (
