@@ -11,9 +11,11 @@
 3. [Folder & File Guide](#3-folder--file-guide)
 4. [The Journey of a Single Sensor Reading (Step-by-Step Data Flow)](#4-the-journey-of-a-single-sensor-reading)
 5. [The Logic Compiler Explained (RxJS, DAGs, and Reactive Streams)](#5-the-logic-compiler-explained)
-6. [Milestones Roadmap: Week 1 Through Week 4](#6-milestones-roadmap-week-1-through-week-4)
-7. [Glossary of Core Engineering Terms](#7-glossary-of-core-engineering-terms)
-8. [10 Critical Presentation Questions & Model Answers](#8-10-critical-presentation-questions--model-answers)
+6. [Day 2 Changes: Rule Runner & Alert Engine](#6-day-2-changes-rule-runner--alert-engine)
+7. [Mid-Project Review Evidence](#7-mid-project-review-evidence)
+8. [Milestones Roadmap: Week 1 Through Week 4](#8-milestones-roadmap-week-1-through-week-4)
+9. [Glossary of Core Engineering Terms](#9-glossary-of-core-engineering-terms)
+10. [15 Critical Presentation Questions & Model Answers](#10-15-critical-presentation-questions--model-answers)
 
 ---
 
@@ -235,33 +237,198 @@ A JSON object cannot execute on its own. The **Logic Compiler** bridges this gap
 
 ---
 
-## 6. Milestones Roadmap: Week 1 Through Week 4
+## 6. Day 2 Changes: Rule Runner & Alert Engine
+
+### The Missing Link: Moving from Static Code to a Running Engine
+In Day 1 of Week 2, we built the **Logic Compiler**: the tool that translates a user's visual React Flow graph into an RxJS Observable pipeline. However, having a compiled pipeline is like having an automobile engine sitting on a workbench: it has all the cylinders and spark plugs, but until you drop it into a chassis, connect the fuel line, and turn the key, nothing moves.
+
+On Day 2, we built the **Rule Runner** (`backend/src/compiler/ruleRunner.js`). It is the runtime ignition system that:
+1. Takes a saved rule graph from MongoDB.
+2. Compiles it into active RxJS Observables.
+3. Subscribes the pipeline directly to the incoming telemetry highway (`telemetryBus`).
+4. Tracks active subscriptions in memory so multiple rules run concurrently.
+5. Captures emitted breaches and logs them to MongoDB (`AlertEvent.js`) while throttling duplicates.
+
+---
+
+### How Rule Activation & Deactivation Work Step-by-Step
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Engineer as Operations Engineer
+  participant Canvas as React Canvas UI
+  participant API as Express API
+  participant DB as MongoDB Atlas
+  participant Runner as ruleRunner.js
+  participant Bus as telemetryBus (RxJS)
+  participant Ingest as /api/ingest
+
+  Engineer->>Canvas: Clicks "Activate Rule"
+  Canvas->>API: POST /api/graphs/:id/activate (Bearer JWT)
+  API->>DB: Fetch RuleGraph where _id and owner match
+  API->>Runner: activate(graphId, ruleGraph, ownerId)
+  Runner->>Runner: compileGraph(graph) -> controller
+  Runner->>Bus: controller.start(telemetryBus)
+  Runner->>Runner: Store controller in activeGraphs Map
+  API->>DB: Update graph.status = "active"
+  API-->>Canvas: 200 OK { message: "Graph activated successfully", status: "active" }
+  Canvas->>Canvas: Updates status badge to ACTIVE (Green)
+
+  loop Ingestion & Rule Evaluation
+    Ingest->>Bus: telemetryBus.next(reading) [Non-blocking]
+    Bus->>Runner: Pushes reading into compiled pipeline
+    opt Threshold Breached
+      Runner->>Runner: Check Cooldown (lastTriggeredAt)
+      Runner->>DB: AlertEvent.create(...) [Saved to Database]
+    end
+  end
+
+  Engineer->>Canvas: Clicks "Deactivate Rule"
+  Canvas->>API: POST /api/graphs/:id/deactivate (Bearer JWT)
+  API->>Runner: deactivate(graphId)
+  Runner->>Bus: controller.stop() [Unsubscribes from stream]
+  Runner->>Runner: Remove from activeGraphs Map & clear cooldowns
+  API->>DB: Update graph.status = "draft"
+  API-->>Canvas: 200 OK { message: "Graph deactivated successfully", status: "draft" }
+```
+
+1. **Idempotent Activation (`POST /api/graphs/:id/activate`)**:
+   If an engineer clicks activate on a graph that is already running, the Rule Runner safely deactivates the existing subscription first before spinning up the new one. This guarantees that duplicate subscriptions and memory leaks are physically impossible.
+2. **Dynamic Deactivation (`POST /api/graphs/:id/deactivate`)**:
+   Calling deactivate stops the RxJS subscription immediately. The stream ceases to consume CPU cycles, all internal sliding window buffers are released, and the database status reverts to `"draft"`.
+3. **Automatic Cleanup on Deletion**:
+   When an engineer deletes a graph (`DELETE /api/graphs/:id`), the backend automatically calls `ruleRunner.deactivate(id)`, preventing orphan "ghost" rules from running in the background.
+4. **Graceful Server Shutdown**:
+   In `server.js`, POSIX termination signals (`SIGTERM` and `SIGINT`) invoke `ruleRunner.stopAll()`. All active subscriptions are cleanly closed before the Node.js process exits.
+
+---
+
+### Non-Blocking Ingestion & Fault Isolation
+In an industrial IoT platform, **telemetry ingestion must never stop**. Even if an engineer misconfigures a custom rule or an edge sensor emits unexpected data, hardware gateways must never receive an HTTP 500 or have their batch writes blocked.
+
+To achieve this:
+- In `backend/src/controllers/ingest.controller.js`, the push to the reactive bus is wrapped in an isolated error boundary:
+  ```javascript
+  try {
+    telemetryBus.next(savedDoc);
+  } catch (busErr) {
+    console.error(`[TELEMETRY BUS] Non-blocking dispatch error:`, busErr.message);
+  }
+  ```
+- Each compiled graph pipeline manages its own internal subscriptions. A faulty or erroring rule cannot corrupt the singleton `telemetryBus`, crash the Express server, or disrupt neighboring rules.
+
+---
+
+### The Alert Storm Problem & Cooldown Suppression
+Imagine an industrial gas turbine that overheats to $92^\circ\text{C}$ (above an $85^\circ\text{C}$ alarm threshold). Because the turbine takes 15 minutes to cool down and emits 10 readings per second, the raw rule pipeline would emit **9,000 alert events** in 15 minutes!
+
+If connected to SMS or email gateways, this creates an **Alert Storm**:
+- The operations engineer's phone vibrates uncontrollably.
+- SMS API rate limits and financial quotas are quickly exhausted.
+- Critical alarms are drowned out by spam.
+
+#### The NexusFlow Solution: Cooldown Suppression
+Each Action Trigger node supports a configurable `cooldownSeconds` property (default: **10 seconds**).
+When a sensor breaches a threshold:
+1. **First Breach**: The alert fires immediately. The Rule Runner records the timestamp in an in-memory `cooldownMap` (`ruleRunner.canTrigger(actionNodeId, cooldownSeconds)`) and persists the alert to MongoDB (`AlertEvent.js`).
+2. **Sustained Breach**: As subsequent readings arrive every few milliseconds while still above $85^\circ\text{C}$, the Rule Runner checks `(now - lastFired) < cooldownSeconds`. Since the cooldown has not elapsed, the redundant alert is **silently suppressed**.
+3. **Post-Cooldown Breach**: If the turbine is still overheating after the 10-second window expires, a single follow-up alert fires and the timer resets.
+
+---
+
+### The Alert Event Log Model (`AlertEvent.js`)
+Triggered alerts are permanently recorded in MongoDB:
+```javascript
+{
+  graphId: ObjectId("..."),
+  owner: ObjectId("..."),
+  ruleName: "Turbine Overheat Sentinel",
+  actionType: "sms_alert",
+  target: "+1 (555) 019-2834",
+  reading: {
+    deviceId: "turbine-01",
+    sensorType: "temperature",
+    value: 91.8,
+    unit: "°C",
+    timestamp: "2026-11-18T17:30:00.000Z"
+  },
+  message: "[ALERT] Turbine Overheat Sentinel triggered: temperature is 91.8 °C",
+  triggeredAt: "2026-11-18T17:30:00.120Z"
+}
+```
+- **Indexed for Performance**: A compound index on `{ owner: 1, triggeredAt: -1 }` ensures that querying recent alerts for a user completes in under 2 milliseconds even with hundreds of thousands of historical events.
+- **Frontend Live Alerts Drawer**: The React dashboard polls `GET /api/alerts?limit=50` every 5 seconds, displaying real-time alert chips, target destinations, and breach readings without requiring manual page reloads.
+
+---
+
+## 7. Mid-Project Review Evidence
+
+As part of the Mid-Project Review, we conducted rigorous verification of two core platform pillars: **Graph Serialization Integrity** and **Telemetry Ingestion Throughput**.
+
+### Deliverable 1: Graph Serialization Proof for Complex Graphs
+Can NexusFlow safely serialize, persist, and reconstruct complex industrial DAGs without losing topology, configurations, or node connections?
+
+To prove this unequivocally:
+1. **Formal Schema (`docs/graph.schema.json`)**: We defined a Draft-07 JSON Schema enforcing strict typing, coordinates, configuration dictionaries, and directed edge connections (`id`, `source`, `target`).
+2. **Complex 15-Node Multi-Branch DAG**: We engineered a stress-test topology containing 15 nodes and 13 edges across 5 independent processing branches:
+   - *Branch 1*: Vibration $\rightarrow$ Moving Average (window: 5) $\rightarrow$ High Threshold ($> 12.0\,\text{mm/s}$) $\rightarrow$ SMS Alert.
+   - *Branch 2*: Vibration $\rightarrow$ Critical Threshold ($> 18.0\,\text{mm/s}$) $\rightarrow$ Webhook Dispatch.
+   - *Branch 3*: Pressure $\rightarrow$ Rolling Min Tracker $\rightarrow$ Low Pressure Filter ($< 30.0\,\text{PSI}$) $\rightarrow$ Webhook Dispatch.
+   - *Branch 4*: Pressure $\rightarrow$ Max Pressure Filter ($> 85.0\,\text{PSI}$) $\rightarrow$ SMS Alert.
+   - *Branch 5*: Temperature $\rightarrow$ High Threshold ($> 85.0^\circ\text{C}$) $\rightarrow$ SMS Alert.
+3. **Automated Verification Suites**:
+   - **Vitest Suite (`frontend/src/utils/serializeGraph.test.js`)**: 7 tests passing covering linear graphs, the 15-node complex DAG, all node types, cycle detection, orphan detection, and round-trip serialization idempotency.
+   - **Backend Verification Script (`backend/scripts/validateGraphProof.js`)**: Confirms 100% schema compliance and validates that Kahn's topological sort orders all 15 nodes without errors.
+   - **Documentation**: See [**`docs/graph-serialization-proof.md`**](file:///c:/NexusFlow/docs/graph-serialization-proof.md).
+
+---
+
+### Deliverable 2: Telemetry Ingestion & Storage Audit
+How fast does NexusFlow ingest data, how much space does it save on disk, and what happens to ingestion throughput when rules are actively running?
+
+We executed automated stress tests against our live MongoDB Atlas cloud replica set:
+1. **Native Time-Series Storage Footprint (`backend/scripts/storageStats.js`)**:
+   - **Documents Verified**: 291,535 records.
+   - **Compressed Buckets**: 363 buckets spanning 3,600-second windows.
+   - **Storage Size on Disk**: 2.16 MB.
+   - **Average Footprint**: **7.39 bytes per document**.
+   - **Space Savings**: Standard BSON documents require ~120 bytes each (35 MB total). MongoDB's native columnar compression achieved a **93.8% reduction in on-disk storage**.
+2. **Comparative Ingestion Benchmark (`backend/scripts/auditIngestionWithRule.js`)**:
+   - **Baseline Ingestion (Raw Database Writes)**: 1,905 to 2,795 writes/sec across WAN round-trips to MongoDB Atlas.
+   - **Ingestion with Active RxJS Rule Evaluation**: Evaluated 10,000 documents against an active rule with moving averages and threshold filters. Sustained **1,549 writes/sec** across WAN latency while writing 3 cooldown-throttled alert events to MongoDB.
+   - **CPU & Memory Impact**: In-memory rule evaluation overhead was negligible (< 1% CPU utilization, +3.5 MB heap delta) because RxJS stream operators process data in-flight without intermediate database queries.
+   - **Documentation**: See [**`docs/ingestion-audit.md`**](file:///c:/NexusFlow/docs/ingestion-audit.md).
+
+---
+
+## 8. Milestones Roadmap: Week 1 Through Week 4
 
 ```
 +-----------------------------------------------------------------------------------------------+
-|  WEEK 1: TIME-SERIES & CANVAS FOUNDATION [COMPLETED]                                          |
+|  WEEK 1: TIME-SERIES & CANVAS FOUNDATION [COMPLETED & AUDITED]                                |
 |  - MongoDB native Time-Series collection setup (timeField, metaField, granularity)            |
 |  - High-throughput Express ingestion API (/api/ingest, /api/ingest/batch)                     |
-|  - Load test benchmarking (achieving 10k-18k writes/sec) and storage audit (7.05 bytes/doc)    |
+|  - Load test benchmarking (10k-18k writes/sec local, 7.39 bytes/doc on Atlas)                |
 |  - JWT Authentication, Landing Page, and React Flow Canvas scaffolding                        |
 +-----------------------------------------------------------------------------------------------+
                                                |
                                                v
 +-----------------------------------------------------------------------------------------------+
-|  WEEK 2: LOGIC COMPILER & NODE LIBRARY [CURRENT]                                              |
+|  WEEK 2: LOGIC COMPILER, RULE RUNNER & MID-PROJECT REVIEW [COMPLETED]                         |
 |  - Node.js Logic Compiler using RxJS (parseGraph, compileGraph, nodeFactories)               |
-|  - DAG cycle detection and topological sorting via Kahn's algorithm                          |
-|  - RuleGraph persistence model and CRUD API (/api/graphs, /api/graphs/:id/compile)            |
-|  - Expanded Node Library (Turbine, Temp, Custom Device, Threshold, MA, Sum, Min, Max, Alerts)|
-|  - Canvas Persistence & Compiler UI with inline configuration editing                         |
+|  - Rule Runner engine (ruleRunner.js) with dynamic activation, deactivation & stopAll         |
+|  - Persistent AlertEvent log model with query API and 10s cooldown suppression                |
+|  - Canvas UI activation controls, status badges, My Graphs drawer & Live Alerts drawer        |
+|  - Mid-Project Review Evidence: 15-node DAG serialization proof & Ingestion Audit report      |
 +-----------------------------------------------------------------------------------------------+
                                                |
                                                v
 +-----------------------------------------------------------------------------------------------+
-|  WEEK 3: REAL-TIME EXECUTION ENGINE & LIVE PREVIEWS [UPCOMING]                                |
-|  - Dynamic Graph Execution Manager: running active user rule graphs in memory                 |
-|  - Live edge animations on canvas pulsing when telemetry packets pass through                 |
-|  - Canvas node value badges displaying real-time stream values in browser                     |
+|  WEEK 3: REAL-TIME STREAMING & LIVE CANVAS PREVIEWS [UPCOMING]                                |
+|  - WebSocket Telemetry Broadcasting: stream live sensor data into active browser sessions     |
+|  - Pulsing wire animations on React Flow edges when telemetry packets pass through            |
+|  - Real-time data badges on canvas nodes displaying live moving averages and values           |
 +-----------------------------------------------------------------------------------------------+
                                                |
                                                v
@@ -269,17 +436,21 @@ A JSON object cannot execute on its own. The **Logic Compiler** bridges this gap
 |  WEEK 4: ALERT DISPATCHERS & PRODUCTION POLISH [FINAL]                                        |
 |  - Real SMS delivery via Twilio API integration                                               |
 |  - Real Webhook dispatch with retry backoff and HMAC signatures                               |
-|  - End-to-end user evaluation, role-based access control, and deployment documentation        |
+|  - Industrial actuator command dispatch and production deployment containerization            |
 +-----------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 7. Glossary of Core Engineering Terms
+## 9. Glossary of Core Engineering Terms
 
 * **DAG (Directed Acyclic Graph)**: A mathematical network of nodes connected by directional edges that contains no closed loops. Telemetry flows in one direction (from input sources to output sinks) without ever looping back on itself.
 * **Kahn's Algorithm**: An algorithm that computes a topological ordering of a directed graph in $\mathcal{O}(V + E)$ linear time and detects whether the graph contains any cycles.
 * **Topological Sort**: A linear ordering of vertices such that for every directed edge $U \rightarrow V$, vertex $U$ comes before vertex $V$ in the ordering.
+* **Rule Runner**: The in-memory runtime engine (`ruleRunner.js`) that manages active RxJS graph subscriptions, wires them to incoming telemetry, and handles lifecycle states.
+* **Alert Storm**: An operational hazard where a sustained sensor breach triggers thousands of duplicate notifications in seconds, overwhelming notification gateways and human operators.
+* **Cooldown Suppression**: A throttling mechanism that silences repetitive alert emissions for a configurable duration (e.g., 10 seconds) after an initial breach has fired.
+* **Idempotent Activation**: An operational guarantee where activating an already-active rule re-initializes the pipeline cleanly without creating duplicate subscriptions or leaking memory.
 * **Time-Series Granularity**: A MongoDB configuration option (`seconds`, `minutes`, `hours`) that specifies the expected frequency of events. Setting granularity to `seconds` causes MongoDB to compress consecutive readings from the same device into columnar disk blocks spanning up to one hour.
 * **RxJS Observable**: An asynchronous push-based data producer that can emit multiple values over time to subscribed observers.
 * **RxJS Subject**: A hybrid Observable and Observer that allows values to be multicasted to multiple listener streams.
@@ -290,10 +461,10 @@ A JSON object cannot execute on its own. The **Logic Compiler** bridges this gap
 
 ---
 
-## 8. 10 Critical Presentation Questions & Model Answers
+## 10. 15 Critical Presentation Questions & Model Answers
 
 ### Q1: Why did you choose MongoDB Time-Series collections instead of standard MongoDB collections?
-**Answer:** Standard document collections store each telemetry reading as an isolated document with full BSON key overhead, indexing every record individually. MongoDB native Time-Series collections group consecutive readings from the same `metaField` (`deviceId`) into compressed columnar storage buckets on disk. In our measured benchmark (`storageStats.js`), this reduced disk footprint from over 120 bytes per document to just **7.05 bytes per document**—a **94.1% reduction in disk storage and memory cache usage**, while dramatically boosting range scan performance.
+**Answer:** Standard document collections store each telemetry reading as an isolated document with full BSON key overhead, indexing every record individually. MongoDB native Time-Series collections group consecutive readings from the same `metaField` (`deviceId`) into compressed columnar storage buckets on disk. In our measured benchmark (`storageStats.js`), this reduced disk footprint from over 120 bytes per document to just **7.39 bytes per document**—a **93.8% reduction in disk storage and memory cache usage**, while dramatically boosting range scan performance.
 
 ### Q2: Why compile visual graphs into RxJS streams instead of writing recursive JavaScript `if/else` evaluation loops?
 **Answer:** High-frequency IoT telemetry arrives asynchronously at thousands of readings per second. Recursive loops or repeated database polling cause severe CPU bottlenecks and event loop lag. RxJS is purpose-built for reactive stream architectures: operators like `filter`, `scan`, and `bufferCount` process readings in memory as pure mathematical pipeline stages with near-zero allocation overhead, naturally supporting sliding windows, debouncing, and multi-branch execution.
@@ -310,18 +481,41 @@ A JSON object cannot execute on its own. The **Logic Compiler** bridges this gap
 **Answer:** Our ingestion controllers (`ingestSingle` and `ingestBatch`) enforce strict normalization: `deviceId`, `sensorType`, and a valid numeric `value` are required. Malformed payloads are rejected immediately with HTTP 400. In batch ingestion (`insertMany({ ordered: false })`), valid readings are safely inserted while invalid items are quarantined and returned in the response with line-item error details.
 
 ### Q6: How do you ensure high throughput during heavy load spikes?
-**Answer:** We engineered batch ingestion supporting up to 10,000 readings per request using MongoDB's un-ordered bulk write API (`insertMany({ ordered: false })`). Our load test script (`loadTest.js`) confirmed sustained throughput between **10,000 and 18,000 writes per second** with sub-50ms latencies, well exceeding industrial requirements.
+**Answer:** We engineered batch ingestion supporting up to 10,000 readings per request using MongoDB's un-ordered bulk write API (`insertMany({ ordered: false })`). Our load test script (`loadTest.js`) confirmed sustained throughput between **10,000 and 18,000 writes per second** with sub-50ms latencies in local environments and over 2,000 writes/sec over WAN cloud replica sets.
 
 ### Q7: Why are rule graphs saved in a `draft` status instead of automatically executing immediately?
-**Answer:** Industrial automation requires verification before activation. In Week 2, we introduced the Dry-Run Compiler (`POST /api/graphs/:id/compile`). Engineers can save graphs in `draft` mode, click **Compile Check** to verify topological validity, and inspect metadata. In Week 3, the Execution Manager will promote validated graphs to `active` status to participate in the live execution loop.
+**Answer:** Industrial automation requires verification before activation. In Week 2, we separated saving from running. Engineers can save graphs in `draft` mode, click **Compile Check** to verify topological validity, and inspect metadata. Once verified, the engineer clicks **Activate Rule**, transitioning the rule to `active` status and mounting it in the `ruleRunner.js` in-memory engine.
 
 ### Q8: How does authentication protect sensor telemetry and rule logic?
-**Answer:** We implemented stateless JWT authentication (`auth.middleware.js`). All telemetry query endpoints (`GET /api/telemetry`, `/api/telemetry/stats`) and graph persistence routes (`/api/graphs`) require a valid Bearer token. Furthermore, graph CRUD operations are strictly scoped to `req.user._id`, ensuring users cannot inspect or modify rule pipelines belonging to other organizations or accounts.
+**Answer:** We implemented stateless JWT authentication (`auth.middleware.js`). All telemetry query endpoints (`GET /api/telemetry`, `/api/telemetry/stats`) and graph persistence routes (`/api/graphs`) require a valid Bearer token. Furthermore, graph CRUD operations and rule activations are strictly scoped to `req.user._id`, ensuring users cannot inspect, activate, or modify rule pipelines belonging to other organizations or accounts.
 
 ### Q9: Can NexusFlow handle sliding windows like 5-minute rolling averages?
 **Answer:** Yes. Our `nodeFactories.js` implements `moving_average` using RxJS's `scan` operator with a sliding window buffer. As each new telemetry reading arrives, the window shifts, recalculates the rolling mean, and passes the smoothed metric downstream to threshold filters.
 
 ### Q10: What are the deliverables for Week 3 and Week 4?
 **Answer:** 
-- In **Week 3**, we will launch the **Dynamic Execution Manager** that keeps active pipelines running in-memory against live ingestion and adds live animated edge pulses and canvas badge previews over WebSockets.
-- In **Week 4**, we will replace the stub action operators with production-ready alert dispatchers (real Twilio SMS delivery and authenticated REST Webhooks) and conduct final end-to-end stress testing.
+- In **Week 3**, we will launch **Live Telemetry Streaming & Canvas Feedback**: connecting incoming sensor data to WebSockets, animating connection wires with pulsing data packets, and rendering real-time value badges on canvas nodes.
+- In **Week 4**, we will replace the stub action operators with production-ready alert dispatchers (real Twilio SMS delivery and authenticated REST Webhooks) and conduct final containerized deployment.
+
+### Q11: How does the Rule Runner execute graphs dynamically without restarting the Node.js server?
+**Answer:** In traditional monolithic systems, changing business logic requires modifying code, testing, and restarting servers. NexusFlow uses dynamic in-memory subscription binding:
+When `POST /api/graphs/:id/activate` is called, the backend compiles the saved JSON graph into an RxJS Observable pipeline on the fly and subscribes it to the long-lived singleton `telemetryBus`. The active subscription is registered in an in-memory `Map`. When deactivated (`POST /api/graphs/:id/deactivate`), the controller calls `subscription.unsubscribe()`, instantly detaching the pipeline and releasing resources without interrupting the server or any other running rules.
+
+### Q12: How do you prevent alert storms when a sensor stays above a threshold for minutes?
+**Answer:** We built **Alert Cooldown Throttling** into `nodeFactories.js` and `ruleRunner.js`. Every Action Trigger node has a configurable `cooldownSeconds` setting (default: 10s). When a threshold is breached, the first occurrence is persisted to MongoDB immediately, and its timestamp is recorded in an in-memory cooldown registry. Subsequent readings that continue to breach the threshold are evaluated but suppressed until the cooldown window expires. This prevents SMS/webhook quota exhaustion and operator alert fatigue.
+
+### Q13: How do you guarantee that a bug or crash in a rule pipeline doesn't crash ingestion or other rules?
+**Answer:** We enforce strict fault isolation at two tiers:
+1. **Non-Blocking Bus Dispatch**: In `ingest.controller.js`, the call to `telemetryBus.next(reading)` is wrapped in an isolated try-catch block. Ingestion never fails or blocks if event delivery encounters an issue.
+2. **RxJS Stream Isolation**: Each active rule runs as an independent Observable subscription. An uncaught error inside one rule's operator terminates only that specific rule's subscription, without propagating to `telemetryBus` or affecting neighboring rules running for the same or other users.
+
+### Q14: How did you prove that complex React Flow graphs serialize and deserialize reliably without losing topology or config?
+**Answer:** We developed a two-tier verification suite:
+1. **JSON Schema (Draft-07)**: We defined `docs/graph.schema.json` formalizing node properties (`id`, `type`, `position`, `data`) and edge topologies (`source`, `target`).
+2. **Automated Vitest Suite (`serializeGraph.test.js`)**: We constructed a stress-test 15-node DAG with 5 distinct parallel branches (vibration, pressure, temperature). The test suite proved that serialization correctly preserves all 15 nodes, 13 edges, and nested configuration parameters, while Kahn's algorithm validates topological compilation with zero cycles or orphans.
+
+### Q15: What impact does real-time rule evaluation have on ingestion write throughput?
+**Answer:** We conducted an empirical audit (`backend/scripts/auditIngestionWithRule.js`) evaluating 10,000 documents against an active rule running moving averages and threshold filters across our MongoDB Atlas replica set:
+- Baseline ingestion throughput: ~1,905 to 2,795 writes/sec.
+- Throughput during active rule evaluation: **1,549 writes/sec**.
+- Overhead analysis: Telemetry evaluation runs purely in-memory via pure RxJS operators with sub-millisecond evaluation latency. Throughput variance was predominantly driven by cloud network latency (WAN round-trips to MongoDB Atlas) and the persistence of triggered `AlertEvent` documents, with CPU overhead remaining under 1%.

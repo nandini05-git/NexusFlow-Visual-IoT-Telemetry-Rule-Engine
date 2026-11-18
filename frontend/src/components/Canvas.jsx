@@ -20,6 +20,8 @@ import {
   updateRuleGraph,
   compileSavedGraph,
   compileAdHocGraph,
+  activateGraph,
+  deactivateGraph,
 } from '../api/graphs';
 import {
   Save,
@@ -38,6 +40,8 @@ import {
   FileCheck,
   Loader2,
   Activity,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 
 const defaultInitialNodes = [
@@ -110,9 +114,11 @@ function CanvasInner() {
   // Rule Graph Persistence State
   const [graphName, setGraphName] = useState('Turbine Overheat Rule');
   const [currentGraphId, setCurrentGraphId] = useState(null);
+  const [graphStatus, setGraphStatus] = useState('draft');
   const [savedGraphs, setSavedGraphs] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isTogglingActive, setIsTogglingActive] = useState(false);
 
   // Notifications & Modals
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
@@ -256,6 +262,7 @@ function CanvasInner() {
       setEdges([]);
       setCurrentGraphId(null);
       setGraphName('Untitled Rule');
+      setGraphStatus('draft');
       setValidationResult(null);
       setSavedJsonData(null);
       setCompileResult(null);
@@ -268,6 +275,7 @@ function CanvasInner() {
     setEdges(defaultInitialEdges);
     setGraphName('Turbine Overheat Rule');
     setCurrentGraphId(null);
+    setGraphStatus('draft');
     setValidationResult(null);
     setCompileResult(null);
     setTimeout(() => fitView({ padding: 0.2 }), 50);
@@ -295,6 +303,7 @@ function CanvasInner() {
           name: graphName.trim() || 'Untitled Rule',
           graph: serialized,
         });
+        setGraphStatus(res.data?.status || 'draft');
         showToast('success', `Graph '${res.data.name}' updated on server!`);
       } else {
         // Create new graph
@@ -304,6 +313,7 @@ function CanvasInner() {
           status: 'draft',
         });
         setCurrentGraphId(res.data._id);
+        setGraphStatus('draft');
         showToast('success', `Graph '${res.data.name}' saved to server!`);
       }
       loadSavedGraphsList();
@@ -330,13 +340,14 @@ function CanvasInner() {
           const doc = res.data;
           setGraphName(doc.name);
           setCurrentGraphId(doc._id);
+          setGraphStatus(doc.status || 'draft');
           if (doc.graph && Array.isArray(doc.graph.nodes)) {
             setNodes(doc.graph.nodes);
             setEdges(doc.graph.edges || []);
             setValidationResult(null);
             setCompileResult(null);
             setTimeout(() => fitView({ padding: 0.2 }), 50);
-            showToast('success', `Loaded '${doc.name}'`);
+            showToast('success', `Loaded '${doc.name}' (${doc.status || 'draft'})`);
           }
         }
       } catch (err) {
@@ -345,6 +356,33 @@ function CanvasInner() {
     },
     [setNodes, setEdges, fitView, handleResetSample]
   );
+
+  // Activate / Deactivate running state on server
+  const handleToggleActivate = useCallback(async () => {
+    if (!currentGraphId) {
+      showToast('error', 'Please save graph to server before activating.');
+      return;
+    }
+
+    setIsTogglingActive(true);
+    try {
+      if (graphStatus === 'active') {
+        const res = await deactivateGraph(currentGraphId);
+        setGraphStatus('draft');
+        showToast('success', res.message || 'Graph deactivated (draft mode).');
+      } else {
+        const res = await activateGraph(currentGraphId);
+        setGraphStatus('active');
+        showToast('success', res.message || 'Graph activated and running! Listening to telemetry.');
+      }
+      loadSavedGraphsList();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      showToast('error', `Activation error: ${msg}`);
+    } finally {
+      setIsTogglingActive(false);
+    }
+  }, [currentGraphId, graphStatus, loadSavedGraphsList]);
 
   // Compile Check: Dry-run compiles via POST /api/graphs/:id/compile or POST /api/graphs/compile
   const handleCompileCheck = useCallback(async () => {
@@ -471,6 +509,29 @@ function CanvasInner() {
           >
             {isCompiling ? <Loader2 size={14} className="spin" /> : <PlayCircle size={14} />}
             <span>Compile Check</span>
+          </button>
+
+          {/* Real Server State Status Badge */}
+          <div className={`toolbar-status-badge ${graphStatus}`} title={`Rule state: ${graphStatus}`}>
+            <span className="status-dot" />
+            <span>{graphStatus === 'active' ? 'Active' : 'Draft'}</span>
+          </div>
+
+          {/* Activate / Deactivate Live Execution Button */}
+          <button
+            onClick={handleToggleActivate}
+            disabled={isTogglingActive}
+            className={`toolbar-btn ${graphStatus === 'active' ? 'btn-deactivate' : 'btn-activate'}`}
+            title={graphStatus === 'active' ? 'Deactivate rule (stop execution)' : 'Activate rule (compile & run)'}
+          >
+            {isTogglingActive ? (
+              <Loader2 size={14} className="spin" />
+            ) : graphStatus === 'active' ? (
+              <PowerOff size={14} />
+            ) : (
+              <Power size={14} />
+            )}
+            <span>{graphStatus === 'active' ? 'Deactivate' : 'Activate'}</span>
           </button>
 
           <div className="toolbar-divider" />

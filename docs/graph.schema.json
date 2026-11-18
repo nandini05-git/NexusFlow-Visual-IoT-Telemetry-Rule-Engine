@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NexusFlowRuleGraph",
+  "description": "JSON Schema specification for NexusFlow serialized React Flow rule graphs (DAG)",
+  "type": "object",
+  "required": ["version", "nodes", "edges"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "exportedAt": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "generator": { "type": "string" },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "edgeCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "position", "data"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": ["dataSource", "mathOperation", "actionTrigger"]
+          },
+          "position": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "deviceId": { "type": "string" },
+              "sensorType": { "type": "string" },
+              "operation": {
+                "type": "string",
+                "enum": ["threshold", "moving_average", "sum", "min", "max"]
+              },
+              "operator": {
+                "type": "string",
+                "enum": [">", ">=", "<", "<=", "==", "!="]
+              },
+              "thresholdValue": { "type": "number" },
+              "windowSize": { "type": "integer", "minimum": 1 },
+              "actionType": { "type": "string" },
+              "target": { "type": "string" },
+              "cooldownSeconds": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "target"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceHandle": {
+            "type": ["string", "null"]
+          },
+          "targetHandle": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    }
+  }
+}

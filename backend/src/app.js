@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import ingestRoutes from './routes/ingest.routes.js';
 import graphRoutes from './routes/graph.routes.js';
+import alertRoutes from './routes/alert.routes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -50,14 +51,19 @@ app.get('/', (req, res) => {
       graphs: 'GET,POST /api/graphs (Protected)',
       graphDetail: 'GET,PUT,DELETE /api/graphs/:id (Protected)',
       graphCompile: 'POST /api/graphs/:id/compile (Protected)',
+      graphActivate: 'POST /api/graphs/:id/activate (Protected)',
+      graphDeactivate: 'POST /api/graphs/:id/deactivate (Protected)',
+      graphsActive: 'GET /api/graphs/active (Protected)',
+      alerts: 'GET /api/alerts?graphId=&limit= (Protected)',
     },
   });
 });
 
-// Auth, Ingestion, and Rule Graph routes
+// Auth, Ingestion, Rule Graph, and Alert routes
 app.use('/api/auth', authRoutes);
 app.use('/api', ingestRoutes);
 app.use('/api/graphs', graphRoutes);
+app.use('/api/alerts', alertRoutes);
 
 // Error handling
 app.use(notFoundHandler);

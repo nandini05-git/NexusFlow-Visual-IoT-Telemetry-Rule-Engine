@@ -27,12 +27,14 @@ flowchart TD
     TSColl[("telemetries (Time-Series Collection)\nBucket Span: 3600s | Granularity: seconds")]
     UserColl[("users (User Accounts)")]
     GraphColl[("rulegraphs (User Rule DAGs)")]
+    AlertColl[("alertevents (Triggered Alert Log)")]
   end
 
-  subgraph Compiler_Layer ["Logic Compiler Engine (RxJS)"]
+  subgraph Compiler_Layer ["Logic Compiler & Rule Runner Engine (RxJS)"]
     GraphParser["graphParser.js\nDAG Validation & Kahn's Topological Sort"]
-    NodeFactories["nodeFactories.js\nRxJS Operators (Filter, Scan, Share)"]
+    NodeFactories["nodeFactories.js\nRxJS Operators (Filter, Scan, Share, Actions)"]
     PipelineAssembler["compileGraph.js\nMulti-Branch Stream Execution"]
+    RuleRunner["ruleRunner.js\nActive Graph Registry & Cooldown Throttling"]
   end
 
   subgraph Frontend_Layer ["React 18 + Vite Frontend Application (Port 3000)"]
@@ -66,6 +68,8 @@ flowchart TD
   - **Database**: MongoDB with verified native **Time-Series Collections** (`timeseries: { timeField: "timestamp", metaField: "metadata", granularity: "seconds" }`)
   - **ODM & Indexing**: Mongoose with compound indexing on `metadata.deviceId` and `timestamp`
   - **Reactive Stream Engine**: RxJS (`rxjs`) for DAG compilation, branching via `share()`, and pipeline operators (`filter`, `scan`, `map`, `tap`)
+  - **Rule Runner**: In-memory active graph manager (`ruleRunner.js`) subscribing to `telemetryBus` with dynamic activation/deactivation and cooldown suppression
+  - **Alert Logging**: Persistent alert event history (`AlertEvent.js`) with indexed queries and per-rule cooldown throttling
   - **Authentication**: JWT (`jsonwebtoken`) & password hashing with `bcryptjs`
   - **Validation**: Server-side DAG validation (Kahn's topological sort, cycle detection, orphan detection)
   - **Security**: Optional `x-api-key` ingestion gate via `INGEST_API_KEY`
@@ -76,7 +80,9 @@ flowchart TD
   - **State & Auth**: React Context API (`AuthContext`) with persistent JWT sessions in `localStorage`
   - **Canvas & Flow Builder**: `@xyflow/react` (React Flow) with custom nodes, interactive controls, and DAG connection validation
   - **Node Library**: Categorized palette (Data Sources, Math Operations, Action Triggers) with inline configuration editing
-  - **Graph Persistence**: Graph Name toolbar, Save to Server, Load Graph dropdown, Compile Check modal, and JSON export
+  - **Graph Persistence & Execution**: Graph Name toolbar, Save/Update to Server, Load Graph dropdown, Compile Check modal, Activate/Deactivate controls, and Status Badge (`draft` / `active`)
+  - **Alerts & Graphs Drawers**: Live Alert Log drawer polling `/api/alerts` every 5 seconds and "My Graphs" manager drawer (open, rename, delete)
+  - **Testing**: Vitest for graph serialization & topological validation (`serializeGraph.test.js`)
   - **HTTP Client**: Axios with automatic Bearer token interceptor
   - **Icons & Styling**: Lucide React + Cyberpunk/Industrial IoT Dark Navy Aesthetic
 
@@ -89,68 +95,79 @@ NexusFlow/
 ├── .gitignore                      # Git ignore rules for Node, Vite, logs & env
 ├── README.md                       # Comprehensive documentation & roadmap
 ├── docs/                           # Project documentation & audit reports
-│   ├── PROJECT_EXPLAINED.md        # Beginner guide, architecture, data flow & 10 review Q&As
+│   ├── PROJECT_EXPLAINED.md        # Beginner guide, architecture, data flow & 15 review Q&As
+│   ├── graph.schema.json           # JSON Schema (Draft-07) for React Flow DAG serialization
+│   ├── graph-serialization-proof.md# Topology & serialization verification report
+│   ├── ingestion-audit.md          # WAN Atlas vs active rule evaluation benchmark audit
 │   ├── week1-ingestion-report.md   # Benchmarks (10k+ writes/sec, 7 bytes/doc audit)
 │   └── week1-summary.md            # Week 1 summary, screenshot checklist & transition
 ├── backend/                        # Node.js + Express backend service
 │   ├── .env.example                # Example environment configuration (PORT, MONGO_URI, JWT, INGEST_API_KEY)
 │   ├── package.json                # Backend dependencies and scripts
-│   ├── server.js                   # Server bootstrap with HTTP & WebSocket server
+│   ├── server.js                   # Server bootstrap with HTTP, WebSocket & graceful shutdown
 │   ├── tests/
-│   │   └── compiler.test.js        # Unit test suite for RxJS logic compiler (6/6 passing)
+│   │   ├── compiler.test.js        # Unit test suite for RxJS logic compiler (6/6 passing)
+│   │   └── ruleRunner.test.js      # Unit test suite for active rule execution & cooldowns (6/6 passing)
 │   ├── scripts/
+│   │   ├── auditIngestionWithRule.js# Comparative ingestion benchmark with active rule evaluation
 │   │   ├── loadTest.js             # High-throughput batched ingestion load test runner
 │   │   ├── mockSensor.js           # Simulated IoT turbine sensor generator
 │   │   ├── storageStats.js         # Time-series storage footprint inspector ($collStats)
 │   │   ├── testAuth.js             # Automated auth test suite
 │   │   ├── testIngest.js           # Automated ingestion and query test suite
-│   │   └── testWeek2Compiler.js    # Automated graph persistence & compiler integration suite
+│   │   ├── testWeek2Compiler.js    # Automated graph persistence & compiler integration suite (14/14 passing)
+│   │   └── validateGraphProof.js   # Script verifying schema & topological compile of complex proof DAG
 │   └── src/
 │       ├── app.js                  # Express application setup and routing
-│       ├── compiler/               # RxJS Logic Compiler Engine
+│       ├── compiler/               # RxJS Logic Compiler & Rule Runner Engine
 │       │   ├── telemetryBus.js      # Singleton RxJS Subject event highway
 │       │   ├── graphParser.js       # DAG validator, cycle detector & Kahn's topological sort
-│       │   ├── nodeFactories.js     # RxJS operators (Filter, Scan, Share, Actions)
-│       │   └── compileGraph.js      # Pipeline wiring with multi-branching (.pipe(share()))
+│       │   ├── nodeFactories.js     # RxJS operators (Filter, Scan, Share, Actions with Cooldown)
+│       │   ├── compileGraph.js      # Pipeline wiring with multi-branching (.pipe(share()))
+│       │   └── ruleRunner.js        # Active graph manager (activate, deactivate, stopAll, cooldown)
 │       ├── config/
 │       │   └── db.js               # MongoDB connection lifecycle & time-series startup verification
 │       ├── controllers/
+│       │   ├── alert.controller.js # Alert event query handler (/api/alerts)
 │       │   ├── auth.controller.js  # Register, Login, and Me profile handlers
-│       │   ├── ingest.controller.js# Ingest, query & stats aggregation handlers
-│       │   └── graph.controller.js # Protected graph CRUD & dry-run compile handlers
+│       │   ├── ingest.controller.js# Ingest, query & stats aggregation handlers (non-blocking bus push)
+│       │   └── graph.controller.js # Protected graph CRUD, compile, activate & deactivate handlers
 │       ├── middleware/
 │       │   ├── apiKeyAuth.js       # Optional x-api-key header ingestion verification
 │       │   ├── auth.js             # JWT verification & req.user attachment
 │       │   └── errorHandler.js     # Centralized error handler & 404 handler
 │       ├── models/
+│       │   ├── AlertEvent.js       # Triggered rule alert event schema with indexes
 │       │   ├── Telemetry.js        # MongoDB Time-Series Mongoose schema with compound indexes
 │       │   ├── User.js             # User account schema with password hashing
 │       │   └── RuleGraph.js        # Rule graph schema for React Flow DAG persistence
 │       └── routes/
+│           ├── alert.routes.js     # Protected alert query routes (/api/alerts)
 │           ├── auth.routes.js      # Auth endpoints (/register, /login, /me)
 │           ├── ingest.routes.js    # Ingestion & protected telemetry endpoints
-│           └── graph.routes.js     # Protected rule graph CRUD & compile endpoints
+│           └── graph.routes.js     # Protected rule graph CRUD, compile, activate & deactivate endpoints
 └── frontend/                       # React + Vite frontend client
     ├── .env.example                # Example frontend environment variables
     ├── index.html                  # HTML entry point
-    ├── package.json                # Frontend dependencies and scripts
+    ├── package.json                # Frontend dependencies and scripts (vitest)
     ├── vite.config.js              # Vite bundler configuration & backend proxy
     └── src/
         ├── main.jsx                # React DOM mount point
         ├── App.jsx                 # App router with protected & public routes
-        ├── index.css               # Styling for landing, auth, canvas toolbar, nodes & dashboard
+        ├── index.css               # Styling for landing, auth, canvas toolbar, nodes, drawers & dashboard
         ├── api/
         │   ├── client.js           # Axios client with Bearer token interceptor
-        │   └── graphs.js           # Graph CRUD & compilation API service
+        │   └── graphs.js           # Graph CRUD, activation, deactivation & alert fetching service
         ├── context/
         │   └── AuthContext.jsx     # Global authentication provider & hook
         ├── utils/
-        │   └── serializeGraph.js   # Graph JSON serializer and topology validator (DAG / orphans)
+        │   ├── serializeGraph.js   # Graph JSON serializer and topology validator (DAG / orphans)
+        │   └── serializeGraph.test.js # Vitest test suite for 15-node DAG serialization & validation
         ├── components/
         │   ├── Navbar.jsx          # Public navigation bar with auth CTA
         │   ├── Footer.jsx          # Platform footer with links & status
         │   ├── ProtectedRoute.jsx  # Route guard redirecting to /login
-        │   ├── Canvas.jsx          # Interactive React Flow workspace with persistence & compile UI
+        │   ├── Canvas.jsx          # Interactive React Flow workspace with status badge & activate controls
         │   ├── Sidebar.jsx         # Draggable categorized node palette (Data Sources, Math, Actions)
         │   └── nodes/
         │       ├── nodeRegistry.js       # Central node type map, categories & default configs
@@ -161,7 +178,7 @@ NexusFlow/
             ├── Landing.jsx         # Marketing landing page (Hero, Features, Steps)
             ├── Register.jsx        # Engineer signup page with form validation
             ├── Login.jsx           # Engineer signin page with JWT authentication
-            └── Dashboard.jsx       # Protected IoT rule canvas & live telemetry inspection panel
+            └── Dashboard.jsx       # Protected IoT rule canvas, live alerts drawer & graph manager drawer
 ```
 
 ---
@@ -211,14 +228,17 @@ npm run dev
 | :--- | :--- | :--- |
 | `npm run dev` | `nodemon server.js` | Starts backend development server with auto-reload |
 | `npm start` | `node server.js` | Starts backend production server |
-| `npm test` | `testAuth && testIngest && testGraph && compiler.test` | Runs full automated test suite (Auth, Ingest, Graph API & Compiler) |
+| `npm test` | `testAuth && testIngest && testGraph && compiler.test && test:runner` | Runs full automated test suite |
 | `npm run test:compiler`| `node --test tests/compiler.test.js` | Unit tests for RxJS logic compiler (valid, cycles, orphans, thresholds, MA, branches) |
-| `npm run test:graph` | `node scripts/testWeek2Compiler.js` | Integration test for graph CRUD, cycle rejection & dry-run compile |
+| `npm run test:runner` | `node --test tests/ruleRunner.test.js` | Unit tests for active rule execution, alert creation, cooldown suppression & error isolation |
+| `npm run test:graph` | `node scripts/testWeek2Compiler.js` | Full integration test for graph CRUD, cycle rejection, compilation, activation, alert logging & deactivation (14/14 passing) |
 | `npm run test:auth` | `node scripts/testAuth.js` | Validates registration, login, JWT token, and profile routes |
 | `npm run test:ingest` | `node scripts/testIngest.js` | Validates single/batch ingestion, caps, error handling & stats |
 | `npm run mock` | `node scripts/mockSensor.js` | Generates simulated turbine temperature telemetry every 1,000ms |
 | `npm run loadtest` | `node scripts/loadTest.js` | Stress tests ingestion velocity (supports `--duration`, `--batch-size`) |
 | `npm run storage:stats`| `node scripts/storageStats.js`| Inspects MongoDB Time-Series storage size and bytes/record |
+| Verification | `node scripts/validateGraphProof.js` | Validates complex 15-node DAG against Draft-07 JSON Schema and topological compiler |
+| Benchmark Audit | `node scripts/auditIngestionWithRule.js` | Compares ingestion throughput with and without active RxJS rule evaluation |
 
 ### Frontend Scripts (`/frontend`)
 | Script | Command | Purpose |
@@ -226,6 +246,7 @@ npm run dev
 | `npm run dev` | `vite` | Starts Vite React development server on port 3000 |
 | `npm run build` | `vite build` | Compiles production assets into `dist/` |
 | `npm run preview` | `vite preview` | Previews production build locally |
+| `npm test` | `vitest run` | Runs Vitest test suite for graph serialization, Draft-07 schema compliance & cycle detection |
 
 ---
 
@@ -242,22 +263,35 @@ npm run dev
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/health` | Public | Service health status & DB connectivity |
-| `POST` | `/api/ingest` | Public (IoT) | Ingest single telemetry reading & pipe to `telemetryBus` |
-| `POST` | `/api/ingest/batch` | Public (IoT) | High-throughput batch ingestion (`ordered: false`, max 10,000) & pipe to `telemetryBus` |
+| `POST` | `/api/ingest` | Public (IoT) | Ingest single telemetry reading, save to Time-Series & non-blocking push to `telemetryBus` |
+| `POST` | `/api/ingest/batch` | Public (IoT) | High-throughput batch ingestion (`ordered: false`, max 10,000) & non-blocking push to `telemetryBus` |
 | `GET` | `/api/telemetry` | **Bearer Token** | Query recent readings (deviceId, sensorType, from, to, limit 1-1000) |
 | `GET` | `/api/telemetry/stats` | **Bearer Token** | Aggregation pipeline returning count, min, max, avg over N minutes |
 | `WS` | `ws://localhost:5000` | Public | Real-time WebSocket event stream |
 
-### Rule Graph Persistence & Logic Compiler Endpoints
+### Rule Graph Persistence & Activation Endpoints
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/graphs` | **Bearer Token** | Save new rule graph (validates DAG, rejects cycles/orphans) |
 | `GET` | `/api/graphs` | **Bearer Token** | List all rule graphs owned by the authenticated user |
+| `GET` | `/api/graphs/active` | **Bearer Token** | List all currently executing rule graphs for the authenticated user |
 | `GET` | `/api/graphs/:id` | **Bearer Token** | Retrieve a specific rule graph by ID |
 | `PUT` | `/api/graphs/:id` | **Bearer Token** | Update rule graph name, description, or JSON topology |
-| `DELETE` | `/api/graphs/:id` | **Bearer Token** | Delete a saved rule graph |
+| `DELETE` | `/api/graphs/:id` | **Bearer Token** | Delete a saved rule graph (automatically stops active subscription if running) |
 | `POST` | `/api/graphs/:id/compile`| **Bearer Token** | Dry-run compile saved graph into executable RxJS streams |
 | `POST` | `/api/graphs/compile` | **Bearer Token** | Dry-run compile current unsaved canvas graph payload |
+| `POST` | `/api/graphs/:id/activate` | **Bearer Token** | Compile and execute graph against `telemetryBus`, set status `"active"` |
+| `POST` | `/api/graphs/:id/deactivate` | **Bearer Token** | Unsubscribe and stop active rule graph, set status `"draft"` |
+
+### Alert Event Endpoints
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/alerts` | **Bearer Token** | Retrieve triggered alert event history (supports `?graphId=<id>&limit=<n>`, default limit 50, max 200) |
+
+> [!NOTE]
+> **Server Startup Behavior**: On server startup, graphs are preserved in MongoDB with their status (`draft` or `active`), but they are **not auto-activated** into memory automatically. They can be dynamically activated on-demand via the canvas UI or the `POST /api/graphs/:id/activate` endpoint.
+>
+> **Alert Cooldown Throttling**: Action Trigger nodes support configurable `cooldownSeconds` (default: 10s). When a sensor reading continuously breaches a threshold, an alert is persisted immediately upon the initial breach, but subsequent alerts are throttled until the cooldown window expires to prevent alert fatigue.
 
 ---
 
@@ -274,29 +308,43 @@ npm run dev
   - Storage footprint inspector demonstrating **7.05 bytes/doc** (`scripts/storageStats.js`).
   - Interactive React Flow canvas with custom nodes, toolbar, and portable graph JSON serialization.
 
-### **Week 2: Logic Compiler & Node Library** *(starts 17 Nov)*
+### **Week 2: Logic Compiler, Rule Runner & Mid-Project Review**
 - [x] **Logic Compiler Foundation (RxJS)**:
   - Installed `rxjs` and built `backend/src/compiler/`.
   - `telemetryBus.js`: Singleton RxJS `Subject` receiving every ingested reading.
   - `graphParser.js`: Server-side DAG validation, cycle detection, orphan detection, and Kahn's topological sort.
-  - `nodeFactories.js`: Stream operators for Data Sources, Math Operations (Threshold, Moving Average, Sum, Min, Max), and Action Trigger stubs.
+  - `nodeFactories.js`: Stream operators for Data Sources, Math Operations (Threshold, Moving Average, Sum, Min, Max), and Action Trigger sinks.
   - `compileGraph.js`: Pipeline assembler supporting branching via `.pipe(share())` with lifecycle controller (`start`, `stop`, `metadata`).
-  - Unit test suite (`tests/compiler.test.js`) verifying valid compilation, cycle rejection, orphan rejection, threshold triggers, moving averages, and independent branching.
+  - Unit test suite (`tests/compiler.test.js`) verifying valid compilation, cycle rejection, orphan rejection, threshold triggers, moving averages, and independent branching (6/6 passing).
 - [x] **Graph Persistence & Dry-Run Compiler API**:
   - `RuleGraph` Mongoose model scoped to authenticated user with status (`draft` \| `active`).
   - Scoped CRUD routes (`POST /api/graphs`, `GET /api/graphs`, `GET /api/graphs/:id`, `PUT /api/graphs/:id`, `DELETE /api/graphs/:id`).
   - Dry-run compilation endpoints (`POST /api/graphs/:id/compile` and `POST /api/graphs/compile`).
-  - Integration test suite (`scripts/testWeek2Compiler.js`) passing all 10 tests.
-- [x] **Node Library & Canvas Persistence UI**:
-  - `nodeRegistry.js` mapping React Flow types to custom nodes with categories and default presets.
-  - Custom UI nodes: Turbine Sensor, Temperature Sensor, Custom Device, Threshold Filter, Moving Average, Sum Accumulator, Min Tracker, Max Tracker, SMS Alert, REST Webhook.
-  - Canvas toolbar additions: Rule Name input, Save/Update to Server, Load Graph dropdown, Compile Check button with success/error modal, and toast alerts.
+  - Integration test suite (`scripts/testWeek2Compiler.js`) passing all 14 tests.
+- [x] **Rule Runner Engine & Dynamic Activation**:
+  - `ruleRunner.js`: In-memory active graph manager (`activate`, `deactivate`, `listActive`, `stopAll`).
+  - Subscribes dynamically to `telemetryBus` with non-blocking error isolation during ingestion.
+  - Endpoints: `POST /api/graphs/:id/activate`, `POST /api/graphs/:id/deactivate`, `GET /api/graphs/active`.
+  - Auto-deactivation on graph deletion and graceful shutdown hook on `SIGTERM` / `SIGINT`.
+  - Unit test suite (`tests/ruleRunner.test.js`) passing all 6 tests.
+- [x] **Alert Event Persistence & Cooldown Suppression**:
+  - `AlertEvent` Mongoose model (`graphId`, `owner`, `ruleName`, `actionType`, `target`, `reading`, `message`, `triggeredAt`) with compound index on `{ owner: 1, triggeredAt: -1 }`.
+  - Configurable `cooldownSeconds` (default: 10s) to suppress duplicate alert floods during sustained breaches.
+  - Protected API: `GET /api/alerts?graphId=&limit=`.
+- [x] **Node Library & Interactive Canvas Controls**:
+  - Categorized palette (Data Sources, Math Operations, Action Triggers) with inline configuration editing.
+  - Canvas toolbar: Status badge (`draft` / `active`), dynamic **Activate / Deactivate** button, Save to Server, Load Graph, and Compile Check modal.
+  - Dashboard Drawers: **Live Alerts Drawer** (polling `/api/alerts` every 5s with loading, empty, and alert state chips) and **My Graphs Drawer** (open, rename, delete with confirmation).
+- [x] **Mid-Project Review Evidence**:
+  - **Graph Serialization Proof**: Draft-07 JSON Schema (`docs/graph.schema.json`), 7-test Vitest suite (`frontend/src/utils/serializeGraph.test.js`) verifying 15-node DAG serialization, and verification report (`docs/graph-serialization-proof.md`).
+  - **Ingestion Audit**: Storage stats (291k+ docs, 7.39 bytes/doc, ~93.8% compression) and comparative benchmark with active rule (`backend/scripts/auditIngestionWithRule.js`, `docs/ingestion-audit.md`).
 
-### **Week 3: Live Rule Execution & Real-Time Dashboards**
-- [ ] **In-Memory Rule Execution**: Connect incoming WebSocket telemetry to dynamically compiled RxJS pipelines to evaluate thresholds in memory.
-- [ ] **Live Visual Dashboards**: Real-time charts subscribing to WebSocket streams.
+### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback**
+- [ ] **WebSocket Telemetry Stream**: Connect incoming sensor telemetry to active WebSocket rooms.
+- [ ] **Live Visual Feedback**: Dynamic pulse animations on React Flow connection edges when telemetry flows through.
+- [ ] **Canvas Real-Time Badges**: Live stream value pills on nodes displaying latest evaluated readings in browser.
 
 ### **Week 4: Webhooks, Actuator Alerting & Production Hardening**
 - [ ] **Outbound Action Webhooks**: Automated dispatching to external APIs and real SMS services when rules trigger.
-- [ ] **Visual Wire Feedback**: Canvas connection wires pulsating when data passes through.
-- [ ] **Final Deployment**: Docker containerization and end-to-end integration polish.
+- [ ] **Actuator Controls**: Bi-directional command dispatch to physical IoT edge devices.
+- [ ] **Final Deployment**: Docker containerization, staging deployment, and end-to-end integration polish.

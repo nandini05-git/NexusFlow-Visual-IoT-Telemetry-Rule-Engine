@@ -233,6 +233,8 @@ export const createActionTriggerOperators = (node, ruleName = 'Rule Graph', acti
           actionType,
           target,
           reading,
+          cooldownSeconds: data.cooldownSeconds !== undefined ? Number(data.cooldownSeconds) : 10,
+          template: data.template || null,
           triggeredAt: new Date().toISOString(),
         });
       }

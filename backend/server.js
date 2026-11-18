@@ -2,6 +2,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import app from './src/app.js';
 import { connectDB } from './src/config/db.js';
+import ruleRunner from './src/compiler/ruleRunner.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -57,7 +58,16 @@ const startServer = async () => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  console.log('SIGTERM signal received: stopping active rule pipelines & closing server');
+  ruleRunner.stopAll();
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: stopping active rule pipelines & closing server');
+  ruleRunner.stopAll();
   server.close(() => {
     console.log('HTTP server closed');
   });

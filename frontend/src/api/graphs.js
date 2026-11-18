@@ -46,3 +46,27 @@ export const compileAdHocGraph = async (payload) => {
   const res = await client.post('/api/graphs/compile', payload);
   return res.data;
 };
+
+// Activate a saved graph (POST /api/graphs/:id/activate)
+export const activateGraph = async (graphId) => {
+  const res = await client.post(`/api/graphs/${graphId}/activate`);
+  return res.data;
+};
+
+// Deactivate a running graph (POST /api/graphs/:id/deactivate)
+export const deactivateGraph = async (graphId) => {
+  const res = await client.post(`/api/graphs/${graphId}/deactivate`);
+  return res.data;
+};
+
+// Fetch currently active graphs for the user (GET /api/graphs/active)
+export const fetchActiveGraphs = async () => {
+  const res = await client.get('/api/graphs/active');
+  return res.data;
+};
+
+// Fetch triggered alerts log (GET /api/alerts?graphId=&limit=)
+export const fetchAlerts = async (params = {}) => {
+  const res = await client.get('/api/alerts', { params });
+  return res.data;
+};

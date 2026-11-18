@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import Sidebar from '../components/Sidebar';
 import { checkHealth, getTelemetry, getTelemetryStats } from '../api/client';
+import { fetchAlerts, fetchUserGraphs, deleteRuleGraph, updateRuleGraph } from '../api/graphs';
 import { useAuth } from '../context/AuthContext';
 import {
   Activity,
@@ -21,6 +22,14 @@ import {
   Gauge,
   Clock,
   Layers,
+  Bell,
+  FolderOpen,
+  Trash2,
+  Edit3,
+  Check,
+  Zap,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -45,6 +54,19 @@ export default function Dashboard() {
   const [statsMinutes, setStatsMinutes] = useState(60);
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Alerts Panel State (Week 2 Day 2)
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertsError, setAlertsError] = useState(null);
+
+  // My Graphs Panel State (Week 2 Day 2)
+  const [showGraphsPanel, setShowGraphsPanel] = useState(false);
+  const [userGraphs, setUserGraphs] = useState([]);
+  const [graphsLoading, setGraphsLoading] = useState(false);
+  const [editingGraphId, setEditingGraphId] = useState(null);
+  const [renamedTitle, setRenamedTitle] = useState('');
 
   // Fetch Health Check
   const fetchHealth = useCallback(async () => {
@@ -93,14 +115,48 @@ export default function Dashboard() {
     }
   }, [selectedDevice, statsMinutes]);
 
-  // Initial loads and timers
+  // Fetch Triggered Alerts (Polls every 5s)
+  const loadAlerts = useCallback(async () => {
+    try {
+      setAlertsError(null);
+      const res = await fetchAlerts({ limit: 50 });
+      if (res && res.data) {
+        setAlerts(res.data);
+      }
+    } catch (err) {
+      console.warn('Alerts fetch notice:', err.response?.data?.message || err.message);
+      setAlertsError(err.response?.data?.message || 'Unable to load alerts.');
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, []);
+
+  // Fetch User Saved Graphs
+  const loadUserGraphs = useCallback(async () => {
+    setGraphsLoading(true);
+    try {
+      const res = await fetchUserGraphs();
+      if (res && res.data) {
+        setUserGraphs(res.data);
+      }
+    } catch (err) {
+      console.warn('Graphs fetch notice:', err.message);
+    } finally {
+      setGraphsLoading(false);
+    }
+  }, []);
+
+  // Initial loads and polling timers
   useEffect(() => {
     fetchHealth();
     fetchTelemetryData();
+    loadAlerts();
+    loadUserGraphs();
 
-    // Auto-refresh telemetry every 5 seconds as specified
-    const telemetryInterval = setInterval(() => {
+    // Auto-refresh telemetry & alerts every 5 seconds
+    const interval = setInterval(() => {
       fetchTelemetryData();
+      loadAlerts();
     }, 5000);
 
     // Health check every 15 seconds
@@ -109,14 +165,39 @@ export default function Dashboard() {
     }, 15000);
 
     return () => {
-      clearInterval(telemetryInterval);
+      clearInterval(interval);
       clearInterval(healthInterval);
     };
-  }, [fetchHealth, fetchTelemetryData]);
+  }, [fetchHealth, fetchTelemetryData, loadAlerts, loadUserGraphs]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  // Delete graph handler
+  const handleDeleteGraph = async (id, name) => {
+    if (window.confirm(`Are you sure you want to delete rule graph '${name}'?`)) {
+      try {
+        await deleteRuleGraph(id);
+        loadUserGraphs();
+      } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+      }
+    }
+  };
+
+  // Rename graph handler
+  const handleSaveRename = async (id) => {
+    if (!renamedTitle.trim()) return;
+    try {
+      await updateRuleGraph(id, { name: renamedTitle.trim() });
+      setEditingGraphId(null);
+      setRenamedTitle('');
+      loadUserGraphs();
+    } catch (err) {
+      alert(`Rename failed: ${err.message}`);
+    }
   };
 
   return (
@@ -131,7 +212,7 @@ export default function Dashboard() {
             <h1 className="brand-title">NexusFlow</h1>
             <p className="brand-tagline">Visual IoT Telemetry & Rule Engine</p>
           </div>
-          <span className="version-pill">Workspace • Day 3</span>
+          <span className="version-pill">Week 2 • Day 2</span>
         </div>
 
         <div className="header-right">
@@ -171,14 +252,57 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Triggered Alerts Drawer Toggle */}
+          <button
+            onClick={() => {
+              setShowAlertsPanel(!showAlertsPanel);
+              if (showDataPanel) setShowDataPanel(false);
+              if (showGraphsPanel) setShowGraphsPanel(false);
+            }}
+            className={`toggle-drawer-btn ${showAlertsPanel ? 'active' : ''}`}
+            title="Inspect triggered rule alerts log"
+          >
+            <Bell size={15} className={alerts.length > 0 ? 'text-orange pulse-icon' : ''} />
+            <span>Alerts</span>
+            {alerts.length > 0 && (
+              <span className="telemetry-count-badge" style={{ background: 'rgba(249, 115, 22, 0.25)', color: '#fb923c' }}>
+                {alerts.length}
+              </span>
+            )}
+          </button>
+
+          {/* My Graphs Drawer Toggle */}
+          <button
+            onClick={() => {
+              setShowGraphsPanel(!showGraphsPanel);
+              if (showDataPanel) setShowDataPanel(false);
+              if (showAlertsPanel) setShowAlertsPanel(false);
+              loadUserGraphs();
+            }}
+            className={`toggle-drawer-btn ${showGraphsPanel ? 'active' : ''}`}
+            title="Manage saved rule graphs"
+          >
+            <FolderOpen size={15} className="text-purple" />
+            <span>My Graphs</span>
+            {userGraphs.length > 0 && (
+              <span className="telemetry-count-badge" style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc' }}>
+                {userGraphs.length}
+              </span>
+            )}
+          </button>
+
           {/* Telemetry Live Feed Toggle */}
           <button
-            onClick={() => setShowDataPanel(!showDataPanel)}
+            onClick={() => {
+              setShowDataPanel(!showDataPanel);
+              if (showAlertsPanel) setShowAlertsPanel(false);
+              if (showGraphsPanel) setShowGraphsPanel(false);
+            }}
             className={`toggle-drawer-btn ${showDataPanel ? 'active' : ''}`}
             title="Inspect live telemetry & aggregation stats"
           >
             <Activity size={15} className="pulse-icon text-cyan" />
-            <span>Recent Telemetry</span>
+            <span>Telemetry</span>
             {telemetryStats?.count > 0 && (
               <span className="telemetry-count-badge">{telemetryStats.count}</span>
             )}
@@ -211,6 +335,181 @@ export default function Dashboard() {
           <Canvas />
         </main>
       </div>
+
+      {/* Alerts Log Drawer (Week 2 Day 2) */}
+      {showAlertsPanel && (
+        <div className="alerts-drawer-day2">
+          <div className="drawer-header">
+            <div className="drawer-title">
+              <Bell size={18} className="text-orange" />
+              <div>
+                <h3>Triggered Rule Alerts</h3>
+                <span className="drawer-subtitle">
+                  Polling /api/alerts every 5 seconds • {alerts.length} total events
+                </span>
+              </div>
+            </div>
+            <button onClick={() => setShowAlertsPanel(false)} className="drawer-close">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="drawer-content" style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
+            {alertsError && (
+              <div className="telemetry-error-box">
+                <AlertCircle size={16} />
+                <span>{alertsError}</span>
+              </div>
+            )}
+
+            {alertsLoading && alerts.length === 0 ? (
+              <div className="empty-telemetry">
+                <RefreshCw size={24} className="spin text-orange" />
+                <p>Loading triggered alerts log...</p>
+              </div>
+            ) : alerts.length === 0 ? (
+              <div className="empty-telemetry">
+                <Zap size={28} className="text-muted" />
+                <p>No alerts triggered yet.</p>
+                <p className="subtext">
+                  Activate a rule graph and ingest matching telemetry readings (e.g. run <code>npm run mock</code>).
+                </p>
+              </div>
+            ) : (
+              alerts.map((al) => (
+                <div key={al._id} className={`alert-item-card ${al.actionType === 'webhook' ? 'webhook' : ''}`}>
+                  <div className="alert-card-top">
+                    <span className="alert-rule-title">{al.ruleName}</span>
+                    <span className={`alert-badge ${al.actionType}`}>
+                      {al.actionType === 'sms_alert' ? 'SMS Alert' : 'REST Webhook'}
+                    </span>
+                  </div>
+                  <p className="alert-message-text">{al.message}</p>
+                  <div className="alert-card-footer">
+                    <span>Target: <code>{al.target || 'N/A'}</code></span>
+                    <span>{new Date(al.triggeredAt).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* My Graphs Manager Drawer (Week 2 Day 2) */}
+      {showGraphsPanel && (
+        <div className="graphs-drawer-day2">
+          <div className="drawer-header">
+            <div className="drawer-title">
+              <FolderOpen size={18} className="text-purple" />
+              <div>
+                <h3>My Rule Graphs</h3>
+                <span className="drawer-subtitle">
+                  Manage saved React Flow graphs & deployment states
+                </span>
+              </div>
+            </div>
+            <button onClick={() => setShowGraphsPanel(false)} className="drawer-close">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="drawer-content" style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
+            {graphsLoading && userGraphs.length === 0 ? (
+              <div className="empty-telemetry">
+                <RefreshCw size={24} className="spin text-purple" />
+                <p>Loading your saved graphs...</p>
+              </div>
+            ) : userGraphs.length === 0 ? (
+              <div className="empty-telemetry">
+                <Layers size={28} className="text-muted" />
+                <p>No saved graphs found.</p>
+                <p className="subtext">Construct a pipeline on the canvas and click "Save to Server".</p>
+              </div>
+            ) : (
+              userGraphs.map((g) => (
+                <div key={g._id} className="graph-item-card">
+                  <div className="graph-item-header">
+                    {editingGraphId === g._id ? (
+                      <div style={{ display: 'flex', gap: '6px', flex: 1, marginRight: '8px' }}>
+                        <input
+                          type="text"
+                          value={renamedTitle}
+                          onChange={(e) => setRenamedTitle(e.target.value)}
+                          className="toolbar-name-input"
+                          style={{ flex: 1, padding: '3px 8px' }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleSaveRename(g._id)}
+                          className="btn-graph-action"
+                          style={{ width: 'auto', padding: '3px 8px' }}
+                          title="Save Rename"
+                        >
+                          <Check size={13} className="text-green" />
+                        </button>
+                        <button
+                          onClick={() => setEditingGraphId(null)}
+                          className="btn-graph-action"
+                          style={{ width: 'auto', padding: '3px 8px' }}
+                          title="Cancel"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="graph-item-title">{g.name}</span>
+                    )}
+                    <span className={`toolbar-status-badge ${g.status || 'draft'}`}>
+                      <span className="status-dot" />
+                      {g.status === 'active' ? 'Active' : 'Draft'}
+                    </span>
+                  </div>
+
+                  <div className="graph-item-meta">
+                    <span>Updated: {new Date(g.updatedAt).toLocaleDateString()} {new Date(g.updatedAt).toLocaleTimeString()}</span>
+                    <span> • {g.graph?.nodes?.length || 0} nodes, {g.graph?.edges?.length || 0} edges</span>
+                  </div>
+
+                  <div className="graph-actions-row">
+                    <button
+                      onClick={() => {
+                        setShowGraphsPanel(false);
+                      }}
+                      className="btn-graph-action"
+                      title="Open on Canvas"
+                    >
+                      <ExternalLink size={13} />
+                      <span>Select on Canvas</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setEditingGraphId(g._id);
+                        setRenamedTitle(g.name);
+                      }}
+                      className="btn-graph-action"
+                      title="Rename graph"
+                    >
+                      <Edit3 size={13} />
+                      <span>Rename</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteGraph(g._id, g.name)}
+                      className="btn-graph-action delete"
+                      title="Delete rule graph"
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Live Telemetry & Stats Panel Drawer */}
       {showDataPanel && (

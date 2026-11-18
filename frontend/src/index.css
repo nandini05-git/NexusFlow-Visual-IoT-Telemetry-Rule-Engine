@@ -2311,3 +2311,204 @@ code {
     transform: translate(-50%, 0);
   }
 }
+
+/* ============================================================
+   WEEK 2 DAY 2: RUNNER ACTIVATION, ALERTS & MY GRAPHS UI
+   ============================================================ */
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.toolbar-status-badge.draft .status-dot {
+  background: #94a3b8;
+}
+
+.toolbar-status-badge.active .status-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.toolbar-btn.btn-activate {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.toolbar-btn.btn-activate:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.toolbar-btn.btn-deactivate {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.toolbar-btn.btn-deactivate:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* Alerts Drawer & List */
+.alerts-drawer-day2,
+.graphs-drawer-day2 {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  width: 440px;
+  bottom: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  animation: slideDrawerLeft 0.2s ease-out;
+}
+
+@keyframes slideDrawerLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.alert-item-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid #f97316;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.alert-item-card:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+}
+
+.alert-item-card.webhook {
+  border-left-color: #38bdf8;
+}
+
+.alert-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.alert-rule-title {
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: #f1f5f9;
+}
+
+.alert-badge {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.alert-badge.sms_alert,
+.alert-badge.sms {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.alert-badge.webhook {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.alert-message-text {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.alert-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 6px;
+}
+
+/* My Graphs Manager Cards */
+.graph-item-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.graph-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.graph-item-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.graph-item-meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.graph-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-graph-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-graph-action:hover {
+  background: #334155;
+  border-color: #64748b;
+}
+
+.btn-graph-action.delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}

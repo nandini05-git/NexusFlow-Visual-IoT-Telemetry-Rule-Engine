@@ -8,6 +8,9 @@ import {
   deleteGraph,
   compileSavedGraph,
   compileAdHocGraph,
+  activateGraph,
+  deactivateGraph,
+  getActiveGraphs,
 } from '../controllers/graph.controller.js';
 
 const router = express.Router();
@@ -19,6 +22,9 @@ router.route('/')
   .post(createGraph)
   .get(getGraphs);
 
+// Active running graphs for authenticated user (placed before /:id)
+router.get('/active', getActiveGraphs);
+
 // Ad-hoc compile endpoint for validating current unsaved canvas graph
 router.post('/compile', compileAdHocGraph);
 
@@ -29,5 +35,9 @@ router.route('/:id')
 
 // Dry-run compile endpoint for saved graph
 router.post('/:id/compile', compileSavedGraph);
+
+// Activate / Deactivate running state
+router.post('/:id/activate', activateGraph);
+router.post('/:id/deactivate', deactivateGraph);
 
 export default router;

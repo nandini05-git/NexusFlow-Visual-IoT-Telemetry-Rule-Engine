@@ -63,8 +63,12 @@ export const ingestSingle = async (req, res, next) => {
     const reading = new Telemetry(normalized);
     const saved = await reading.save();
 
-    // Pipe reading to RxJS telemetryBus
-    telemetryBus.next(saved.toObject ? saved.toObject() : saved);
+    // Non-blocking pipe to RxJS telemetryBus (isolated from rule execution errors)
+    try {
+      telemetryBus.next(saved.toObject ? saved.toObject() : saved);
+    } catch (busErr) {
+      console.error('[TelemetryBus Single Error]:', busErr.message);
+    }
 
     // Broadcast if WebSocket server is attached to req.app
     const broadcastTelemetry = req.app.get('broadcastTelemetry');
@@ -145,11 +149,15 @@ export const ingestBatch = async (req, res, next) => {
       }
     }
 
-    // Pipe batch readings to RxJS telemetryBus
+    // Non-blocking batch pipe to RxJS telemetryBus (isolated from rule execution errors)
     if (Array.isArray(inserted)) {
-      inserted.forEach((doc) => {
-        telemetryBus.next(doc.toObject ? doc.toObject() : doc);
-      });
+      try {
+        inserted.forEach((doc) => {
+          telemetryBus.next(doc.toObject ? doc.toObject() : doc);
+        });
+      } catch (busErr) {
+        console.error('[TelemetryBus Batch Error]:', busErr.message);
+      }
     }
 
     const broadcastTelemetry = req.app.get('broadcastTelemetry');

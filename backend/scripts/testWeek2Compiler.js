@@ -179,28 +179,65 @@ const runTests = async () => {
     throw new Error('Ad-hoc compile failed');
   }
 
-  // 9. Ingest telemetry that breaches threshold
-  console.log('\n[Test 9] Ingest Telemetry (POST /api/ingest) with value 89.2°C');
+  // 9. Activate saved graph (POST /api/graphs/:id/activate)
+  console.log(`\n[Test 9] Activate Saved Graph (POST /api/graphs/${createdGraphId}/activate)`);
+  const actRes = await callAPI(`/api/graphs/${createdGraphId}/activate`, { method: 'POST' });
+  console.log(` -> Status: ${actRes.status}`);
+  console.log(` -> Message: ${actRes.data?.message}`);
+  if (actRes.status !== 200 || actRes.data?.data?.status !== 'active') {
+    throw new Error('Graph activation failed');
+  }
+
+  // 10. List active running graphs (GET /api/graphs/active)
+  console.log('\n[Test 10] List Active Graphs (GET /api/graphs/active)');
+  const activeRes = await callAPI('/api/graphs/active');
+  console.log(` -> Status: ${activeRes.status}, Active Count: ${activeRes.data?.count}`);
+  if (activeRes.status !== 200 || activeRes.data?.count < 1) {
+    throw new Error('Active graph listing failed');
+  }
+
+  // 11. Ingest telemetry that breaches threshold (92.5 > 85)
+  console.log('\n[Test 11] Ingest Telemetry (POST /api/ingest) with value 92.5°C');
   const ingestRes = await callAPI('/api/ingest', {
     method: 'POST',
     body: JSON.stringify({
       deviceId: 'turbine-01',
       sensorType: 'temperature',
-      value: 89.2,
+      value: 92.5,
       unit: '°C',
     }),
   });
   console.log(` -> Status: ${ingestRes.status}, Ingested: ${ingestRes.data?.success}`);
   if (ingestRes.status !== 201) throw new Error('Ingest failed');
 
-  // 10. Clean up - Delete graph
-  console.log(`\n[Test 10] Delete Graph (DELETE /api/graphs/${createdGraphId})`);
+  // Small delay for async alert persistence
+  await new Promise((r) => setTimeout(r, 100));
+
+  // 12. Query Alert Log (GET /api/alerts)
+  console.log(`\n[Test 12] Query Alert Log (GET /api/alerts?graphId=${createdGraphId})`);
+  const alertRes = await callAPI(`/api/alerts?graphId=${createdGraphId}`);
+  console.log(` -> Status: ${alertRes.status}, Alerts Count: ${alertRes.data?.count}`);
+  if (alertRes.status !== 200 || alertRes.data?.count < 1) {
+    throw new Error('Alert logging failed');
+  }
+  console.log(` -> First Alert Message: ${alertRes.data?.data[0]?.message}`);
+
+  // 13. Deactivate graph (POST /api/graphs/:id/deactivate)
+  console.log(`\n[Test 13] Deactivate Graph (POST /api/graphs/${createdGraphId}/deactivate)`);
+  const deactRes = await callAPI(`/api/graphs/${createdGraphId}/deactivate`, { method: 'POST' });
+  console.log(` -> Status: ${deactRes.status}, Status: ${deactRes.data?.data?.status}`);
+  if (deactRes.status !== 200 || deactRes.data?.data?.status !== 'draft') {
+    throw new Error('Graph deactivation failed');
+  }
+
+  // 14. Clean up - Delete graph
+  console.log(`\n[Test 14] Delete Graph (DELETE /api/graphs/${createdGraphId})`);
   const delRes = await callAPI(`/api/graphs/${createdGraphId}`, { method: 'DELETE' });
   console.log(` -> Status: ${delRes.status}`);
   if (delRes.status !== 200) throw new Error('Graph deletion failed');
 
   console.log('\n========================================================');
-  console.log('   ALL 10 COMPILER & GRAPH INTEGRATION TESTS PASSED!');
+  console.log('   ALL 14 COMPILER, RUNNER & ALERT INTEGRATION TESTS PASSED!');
   console.log('========================================================\n');
 };
 

@@ -1,6 +1,7 @@
 import RuleGraph from '../models/RuleGraph.js';
 import { parseGraph, GraphValidationError } from '../compiler/graphParser.js';
 import { compileGraph } from '../compiler/compileGraph.js';
+import ruleRunner from '../compiler/ruleRunner.js';
 
 /**
  * Graph Controller
@@ -179,6 +180,9 @@ export const deleteGraph = async (req, res, next) => {
       });
     }
 
+    // Stop execution in ruleRunner if active
+    ruleRunner.deactivate(deleted._id);
+
     return res.status(200).json({
       success: true,
       message: `Rule graph '${deleted.name}' deleted successfully.`,
@@ -187,6 +191,86 @@ export const deleteGraph = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// POST /api/graphs/:id/activate (Compile, run, and mark status "active")
+export const activateGraph = async (req, res, next) => {
+  try {
+    const graphDoc = await RuleGraph.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+
+    if (!graphDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rule graph not found or not owned by you.',
+      });
+    }
+
+    // Compile & activate in ruleRunner (stops duplicate subscriptions if already running)
+    const runResult = ruleRunner.activate(graphDoc._id, graphDoc, req.user._id);
+
+    // Update status in MongoDB
+    graphDoc.status = 'active';
+    await graphDoc.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Rule graph '${graphDoc.name}' activated and running.`,
+      data: graphDoc,
+      metadata: runResult.metadata,
+      activatedAt: runResult.activatedAt,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      errors: error.errors || [error.message],
+    });
+  }
+};
+
+// POST /api/graphs/:id/deactivate (Stop execution and set status "draft")
+export const deactivateGraph = async (req, res, next) => {
+  try {
+    const graphDoc = await RuleGraph.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+
+    if (!graphDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rule graph not found or not owned by you.',
+      });
+    }
+
+    // Stop in ruleRunner
+    ruleRunner.deactivate(graphDoc._id);
+
+    // Update status in MongoDB
+    graphDoc.status = 'draft';
+    await graphDoc.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Rule graph '${graphDoc.name}' deactivated.`,
+      data: graphDoc,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/graphs/active (List running graphs for authenticated user)
+export const getActiveGraphs = (req, res) => {
+  const activeList = ruleRunner.listActive(req.user._id);
+  return res.status(200).json({
+    success: true,
+    count: activeList.length,
+    data: activeList,
+  });
 };
 
 // POST /api/graphs/:id/compile (Dry-run compile saved graph)
