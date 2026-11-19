@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -13,6 +13,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from './nodes/nodeRegistry';
 import { validateGraph, serializeGraph, downloadGraphJson } from '../utils/serializeGraph';
+import { GRAPH_TEMPLATES } from '../utils/graphTemplates';
 import {
   fetchUserGraphs,
   fetchGraphById,
@@ -42,6 +43,15 @@ import {
   Activity,
   Power,
   PowerOff,
+  Undo2,
+  Redo2,
+  LayoutGrid,
+  HelpCircle,
+  Keyboard,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 
 const defaultInitialNodes = [
@@ -102,7 +112,7 @@ const defaultInitialEdges = [
   },
 ];
 
-let idCounter = 10;
+let idCounter = 100;
 const getId = (type) => `${type}-${Date.now()}-${idCounter++}`;
 
 function CanvasInner() {
@@ -120,20 +130,94 @@ function CanvasInner() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
 
-  // Notifications & Modals
-  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
-  const [validationResult, setValidationResult] = useState(null);
+  // History State for Undo / Redo
+  const [history, setHistory] = useState({
+    past: [],
+    future: [],
+  });
+
+  // Live Problems Panel State
+  const [liveProblems, setLiveProblems] = useState([]);
+  const [isProblemsOpen, setIsProblemsOpen] = useState(false);
+
+  // Modals & Notifications
+  const [toast, setToast] = useState(null);
   const [compileResult, setCompileResult] = useState(null);
   const [savedJsonData, setSavedJsonData] = useState(null);
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [showCompileModal, setShowCompileModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connectionNotice, setConnectionNotice] = useState(null);
 
-  const showToast = (type, message) => {
+  const showToast = useCallback((type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
-  };
+  }, []);
+
+  /**
+   * Push current state to past history snapshot
+   */
+  const pushHistory = useCallback(
+    (newNodes, newEdges) => {
+      setHistory((prev) => ({
+        past: [
+          ...prev.past.slice(-25), // Keep max 25 history states
+          { nodes: JSON.parse(JSON.stringify(newNodes)), edges: JSON.parse(JSON.stringify(newEdges)) },
+        ],
+        future: [],
+      }));
+    },
+    []
+  );
+
+  /**
+   * Undo last edit
+   */
+  const handleUndo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+      const previousState = prev.past[prev.past.length - 1];
+      const newPast = prev.past.slice(0, prev.past.length - 1);
+      const currentSnapshot = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+      };
+
+      setNodes(previousState.nodes);
+      setEdges(previousState.edges);
+      showToast('success', 'Undo applied');
+
+      return {
+        past: newPast,
+        future: [currentSnapshot, ...prev.future],
+      };
+    });
+  }, [nodes, edges, setNodes, setEdges, showToast]);
+
+  /**
+   * Redo previously undone edit
+   */
+  const handleRedo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+      const nextState = prev.future[0];
+      const newFuture = prev.future.slice(1);
+      const currentSnapshot = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+      };
+
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      showToast('success', 'Redo applied');
+
+      return {
+        past: [...prev.past, currentSnapshot],
+        future: newFuture,
+      };
+    });
+  }, [nodes, edges, setNodes, setEdges, showToast]);
 
   // Load user saved graphs on mount
   const loadSavedGraphsList = useCallback(async () => {
@@ -150,6 +234,42 @@ function CanvasInner() {
   useEffect(() => {
     loadSavedGraphsList();
   }, [loadSavedGraphsList]);
+
+  /**
+   * Live Graph Validation & Problem Extraction
+   * Runs whenever nodes or edges mutate, highlighting nodes with missing required config
+   */
+  useEffect(() => {
+    const res = validateGraph(nodes, edges);
+    setLiveProblems(res.errors || []);
+
+    // Check if any node error flags need updating
+    const issuesMap = res.nodeIssues || {};
+    let hasChanges = false;
+
+    const updated = nodes.map((n) => {
+      const issues = issuesMap[n.id];
+      const hasErr = !!(issues && issues.length > 0);
+      const errMsg = hasErr ? issues.join(', ') : '';
+
+      if (n.data?.hasError !== hasErr || n.data?.errorMessage !== errMsg) {
+        hasChanges = true;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            hasError: hasErr,
+            errorMessage: errMsg,
+          },
+        };
+      }
+      return n;
+    });
+
+    if (hasChanges) {
+      setNodes(updated);
+    }
+  }, [nodes, edges, setNodes]);
 
   /**
    * Validate connections:
@@ -192,6 +312,8 @@ function CanvasInner() {
         return;
       }
 
+      pushHistory(nodes, edges);
+
       setEdges((eds) =>
         addEdge(
           {
@@ -204,7 +326,7 @@ function CanvasInner() {
       );
       setConnectionNotice(null);
     },
-    [isValidConnection, setEdges]
+    [isValidConnection, setEdges, pushHistory, nodes, edges]
   );
 
   const onDragOver = useCallback((event) => {
@@ -241,52 +363,185 @@ function CanvasInner() {
           data: initialData,
         };
 
+        pushHistory(nodes, edges);
         setNodes((nds) => nds.concat(newNode));
       } catch (err) {
         console.error('Failed to parse dropped node:', err);
       }
     },
-    [screenToFlowPosition, nodes.length, setNodes]
+    [screenToFlowPosition, nodes, edges, setNodes, pushHistory]
   );
 
   // Delete selected nodes or edges
   const handleDeleteSelected = useCallback(() => {
+    const selectedNodes = nodes.filter((node) => node.selected);
+    const selectedEdges = edges.filter((edge) => edge.selected);
+
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+      showToast('error', 'Select one or more nodes or wires to delete.');
+      return;
+    }
+
+    pushHistory(nodes, edges);
     setNodes((nds) => nds.filter((node) => !node.selected));
     setEdges((eds) => eds.filter((edge) => !edge.selected));
-  }, [setNodes, setEdges]);
+    showToast('success', `Deleted ${selectedNodes.length} node(s) and ${selectedEdges.length} connection(s).`);
+  }, [nodes, edges, setNodes, setEdges, pushHistory, showToast]);
+
+  // Duplicate Selected Node(s)
+  const handleDuplicateSelected = useCallback(() => {
+    const selectedNodes = nodes.filter((n) => n.selected);
+
+    if (selectedNodes.length === 0) {
+      showToast('error', 'Select a node on the canvas to duplicate (Ctrl+D).');
+      return;
+    }
+
+    pushHistory(nodes, edges);
+
+    const clones = selectedNodes.map((n) => ({
+      ...JSON.parse(JSON.stringify(n)),
+      id: getId(n.type),
+      position: {
+        x: n.position.x + 40,
+        y: n.position.y + 40,
+      },
+      selected: true,
+      data: {
+        ...JSON.parse(JSON.stringify(n.data)),
+        label: `${n.data.label || 'Node'} (Copy)`,
+      },
+    }));
+
+    // Deselect original nodes and append clones
+    setNodes((nds) =>
+      nds.map((n) => (n.selected ? { ...n, selected: false } : n)).concat(clones)
+    );
+    showToast('success', `Duplicated ${clones.length} node(s).`);
+  }, [nodes, edges, setNodes, pushHistory, showToast]);
+
+  // Auto-Layout: Topological Left-to-Right Layering
+  const handleAutoLayout = useCallback(() => {
+    if (nodes.length === 0) return;
+
+    pushHistory(nodes, edges);
+
+    // Compute in-degrees and adjacency
+    const incoming = new Map(nodes.map((n) => [n.id, 0]));
+    const outgoing = new Map(nodes.map((n) => [n.id, []]));
+
+    edges.forEach((e) => {
+      if (incoming.has(e.target)) incoming.set(e.target, incoming.get(e.target) + 1);
+      if (outgoing.has(e.source)) outgoing.get(e.source).push(e.target);
+    });
+
+    // Assign layers: BFS longest-path from sources
+    const layers = new Map();
+    nodes.forEach((n) => {
+      if (n.type === 'dataSource' || (incoming.get(n.id) || 0) === 0) {
+        layers.set(n.id, 0);
+      }
+    });
+
+    // Fallback if no sources found
+    if (layers.size === 0 && nodes.length > 0) {
+      layers.set(nodes[0].id, 0);
+    }
+
+    // Traverse to compute depths
+    for (let iter = 0; iter < nodes.length; iter++) {
+      edges.forEach((e) => {
+        const srcLayer = layers.get(e.source);
+        if (srcLayer !== undefined) {
+          const curTargetLayer = layers.get(e.target) || 0;
+          layers.set(e.target, Math.max(curTargetLayer, srcLayer + 1));
+        }
+      });
+    }
+
+    // Assign any unvisited nodes by type
+    nodes.forEach((n) => {
+      if (!layers.has(n.id)) {
+        if (n.type === 'dataSource') layers.set(n.id, 0);
+        else if (n.type === 'mathOperation') layers.set(n.id, 1);
+        else if (n.type === 'actionTrigger') layers.set(n.id, 2);
+        else layers.set(n.id, 0);
+      }
+    });
+
+    // Group nodes by layer
+    const layerBuckets = new Map();
+    nodes.forEach((n) => {
+      const l = layers.get(n.id) || 0;
+      if (!layerBuckets.has(l)) layerBuckets.set(l, []);
+      layerBuckets.get(l).push(n);
+    });
+
+    // Reposition nodes cleanly
+    const layoutNodes = nodes.map((n) => {
+      const l = layers.get(n.id) || 0;
+      const bucket = layerBuckets.get(l);
+      const indexInBucket = bucket.findIndex((item) => item.id === n.id);
+
+      return {
+        ...n,
+        position: {
+          x: 60 + l * 320,
+          y: 80 + indexInBucket * 180,
+        },
+      };
+    });
+
+    setNodes(layoutNodes);
+    showToast('success', 'Auto-layout arranged nodes left-to-right.');
+    setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
+  }, [nodes, edges, setNodes, pushHistory, fitView, showToast]);
 
   // Clear canvas
   const handleClearCanvas = useCallback(() => {
     if (window.confirm('Are you sure you want to clear the canvas? All unsaved nodes and connections will be removed.')) {
+      pushHistory(nodes, edges);
       setNodes([]);
       setEdges([]);
       setCurrentGraphId(null);
       setGraphName('Untitled Rule');
       setGraphStatus('draft');
-      setValidationResult(null);
       setSavedJsonData(null);
       setCompileResult(null);
     }
-  }, [setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, pushHistory]);
 
-  // Reset to default sample pipeline
-  const handleResetSample = useCallback(() => {
-    setNodes(defaultInitialNodes);
-    setEdges(defaultInitialEdges);
-    setGraphName('Turbine Overheat Rule');
-    setCurrentGraphId(null);
-    setGraphStatus('draft');
-    setValidationResult(null);
-    setCompileResult(null);
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
-  }, [setNodes, setEdges, fitView]);
+  // Load Graph Template from predefined library
+  const handleSelectTemplate = useCallback(
+    (e) => {
+      const templateId = e.target.value;
+      if (!templateId) return;
+
+      const template = GRAPH_TEMPLATES.find((t) => t.id === templateId);
+      if (!template) return;
+
+      pushHistory(nodes, edges);
+      setNodes(JSON.parse(JSON.stringify(template.graph.nodes)));
+      setEdges(JSON.parse(JSON.stringify(template.graph.edges)));
+      setGraphName(template.name);
+      setCurrentGraphId(null);
+      setGraphStatus('draft');
+      setCompileResult(null);
+
+      showToast('success', `Loaded Template: "${template.name}"`);
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
+
+      // Reset dropdown
+      e.target.value = '';
+    },
+    [nodes, edges, setNodes, setEdges, pushHistory, fitView, showToast]
+  );
 
   // Save Graph to Backend Server (POST /api/graphs or PUT /api/graphs/:id)
   const handleSaveToServer = useCallback(async () => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     const result = validateGraph(currentNodes, currentEdges);
-    setValidationResult(result);
 
     if (!result.isValid) {
       showToast('error', `Cannot save: ${result.errors[0]}`);
@@ -323,14 +578,13 @@ function CanvasInner() {
     } finally {
       setIsSaving(false);
     }
-  }, [getNodes, getEdges, currentGraphId, graphName, loadSavedGraphsList]);
+  }, [getNodes, getEdges, currentGraphId, graphName, loadSavedGraphsList, showToast]);
 
   // Load Graph from Dropdown selection
   const handleSelectGraph = useCallback(
     async (e) => {
       const selectedId = e.target.value;
       if (!selectedId) {
-        handleResetSample();
         return;
       }
 
@@ -338,13 +592,13 @@ function CanvasInner() {
         const res = await fetchGraphById(selectedId);
         if (res.success && res.data) {
           const doc = res.data;
+          pushHistory(nodes, edges);
           setGraphName(doc.name);
           setCurrentGraphId(doc._id);
           setGraphStatus(doc.status || 'draft');
           if (doc.graph && Array.isArray(doc.graph.nodes)) {
             setNodes(doc.graph.nodes);
             setEdges(doc.graph.edges || []);
-            setValidationResult(null);
             setCompileResult(null);
             setTimeout(() => fitView({ padding: 0.2 }), 50);
             showToast('success', `Loaded '${doc.name}' (${doc.status || 'draft'})`);
@@ -354,7 +608,7 @@ function CanvasInner() {
         showToast('error', `Failed to load graph: ${err.message}`);
       }
     },
-    [setNodes, setEdges, fitView, handleResetSample]
+    [nodes, edges, setNodes, setEdges, fitView, pushHistory, showToast]
   );
 
   // Activate / Deactivate running state on server
@@ -378,52 +632,45 @@ function CanvasInner() {
       loadSavedGraphsList();
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
-      showToast('error', `Activation error: ${msg}`);
+      showToast('error', `State change failed: ${msg}`);
     } finally {
       setIsTogglingActive(false);
     }
-  }, [currentGraphId, graphStatus, loadSavedGraphsList]);
+  }, [currentGraphId, graphStatus, loadSavedGraphsList, showToast]);
 
-  // Compile Check: Dry-run compiles via POST /api/graphs/:id/compile or POST /api/graphs/compile
+  // Dry-Run Compile Check
   const handleCompileCheck = useCallback(async () => {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
-    const clientValidation = validateGraph(currentNodes, currentEdges);
+    const result = validateGraph(currentNodes, currentEdges);
 
-    if (!clientValidation.isValid) {
-      setValidationResult(clientValidation);
-      showToast('error', `Compiler Check Failed: ${clientValidation.errors[0]}`);
+    if (!result.isValid) {
+      showToast('error', `Validation Failed: ${result.errors[0]}`);
       return;
     }
 
     setIsCompiling(true);
-    const serialized = serializeGraph(currentNodes, currentEdges);
-
     try {
+      const serialized = serializeGraph(currentNodes, currentEdges);
       let res;
       if (currentGraphId) {
-        // Compile saved graph
         res = await compileSavedGraph(currentGraphId);
       } else {
-        // Compile current canvas graph ad-hoc
-        res = await compileAdHocGraph({
-          name: graphName.trim() || 'Canvas Rule',
-          graph: serialized,
-        });
+        res = await compileAdHocGraph(serialized);
       }
 
-      setCompileResult(res);
-      setShowCompileModal(true);
-      showToast('success', 'Logic Compiler: Graph successfully compiled into RxJS streams!');
+      if (res.success) {
+        setCompileResult(res);
+        setShowCompileModal(true);
+        showToast('success', `Compilation Verified: ${res.metadata?.nodeCount} nodes topologically sorted.`);
+      }
     } catch (err) {
-      const errData = err.response?.data;
-      const errorList = errData?.errors || [errData?.message || err.message];
-      setValidationResult({ isValid: false, errors: errorList });
-      showToast('error', `Compilation Error: ${errorList[0]}`);
+      const msg = err.response?.data?.message || err.message;
+      showToast('error', `Compiler error: ${msg}`);
     } finally {
       setIsCompiling(false);
     }
-  }, [getNodes, getEdges, currentGraphId, graphName]);
+  }, [getNodes, getEdges, currentGraphId, showToast]);
 
   // Inspect Serialized JSON
   const handleInspectJson = useCallback(() => {
@@ -449,6 +696,50 @@ function CanvasInner() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  /**
+   * Keyboard Shortcuts Handler
+   * Captures Ctrl+Z, Ctrl+Y, Ctrl+D, Ctrl+S, Delete/Backspace outside of inputs
+   */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Do not intercept if focus is inside an input, textarea, or select
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return;
+      }
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (cmdKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if (cmdKey && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      } else if (cmdKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        handleDuplicateSelected();
+      } else if (cmdKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveToServer();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Multi-select delete
+        handleDeleteSelected();
+      } else if (e.key === '?' || (cmdKey && e.key === '/')) {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo, handleDuplicateSelected, handleSaveToServer, handleDeleteSelected]);
 
   return (
     <div className="canvas-wrapper" ref={reactFlowWrapper}>
@@ -489,12 +780,47 @@ function CanvasInner() {
             ))}
           </select>
 
+          {/* Templates Dropdown */}
+          <select
+            defaultValue=""
+            onChange={handleSelectTemplate}
+            className="toolbar-select template-select"
+            title="Load ready-made industrial rule template"
+          >
+            <option value="" disabled>Templates...</option>
+            {GRAPH_TEMPLATES.map((tmpl) => (
+              <option key={tmpl.id} value={tmpl.id}>
+                ⚡ {tmpl.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Undo / Redo Controls */}
+          <div className="toolbar-btn-group">
+            <button
+              onClick={handleUndo}
+              disabled={history.past.length === 0}
+              className="toolbar-icon-btn"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={history.future.length === 0}
+              className="toolbar-icon-btn"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
+
           {/* Save to Server */}
           <button
             onClick={handleSaveToServer}
             disabled={isSaving}
             className="toolbar-btn btn-save"
-            title="Save or Update graph on server"
+            title="Save or Update graph on server (Ctrl+S)"
           >
             {isSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
             <span>{currentGraphId ? 'Update Server' : 'Save to Server'}</span>
@@ -533,36 +859,66 @@ function CanvasInner() {
             )}
             <span>{graphStatus === 'active' ? 'Deactivate' : 'Activate'}</span>
           </button>
+        </div>
 
-          <div className="toolbar-divider" />
+        <div className="toolbar-right">
+          {/* Duplicate Node */}
+          <button
+            onClick={handleDuplicateSelected}
+            className="toolbar-btn btn-duplicate"
+            title="Duplicate selected node (Ctrl+D)"
+          >
+            <Copy size={14} />
+            <span>Duplicate</span>
+          </button>
+
+          {/* Auto-Layout */}
+          <button
+            onClick={handleAutoLayout}
+            className="toolbar-btn btn-layout"
+            title="Auto-arrange nodes topologically left-to-right"
+          >
+            <LayoutGrid size={14} />
+            <span>Auto-Layout</span>
+          </button>
+
+          {/* Fit View */}
+          <button
+            onClick={() => fitView({ padding: 0.2, duration: 400 })}
+            className="toolbar-btn btn-fit"
+            title="Fit canvas to view"
+          >
+            <ZoomIn size={14} />
+            <span>Fit View</span>
+          </button>
+
+          {/* Keyboard Shortcuts Popover Trigger */}
+          <button
+            onClick={() => setShowShortcutsModal(true)}
+            className="toolbar-btn btn-shortcuts"
+            title="Keyboard shortcuts cheat sheet"
+          >
+            <Keyboard size={14} />
+            <span>Shortcuts</span>
+          </button>
 
           {/* Inspect / Export JSON */}
           <button onClick={handleInspectJson} className="toolbar-btn btn-export" title="Inspect Serialized JSON">
             <Code2 size={14} />
-            <span>Inspect JSON</span>
+            <span>JSON</span>
           </button>
           <button onClick={handleExportJson} className="toolbar-btn" title="Download JSON file">
             <Download size={14} />
-            <span>Export</span>
           </button>
-        </div>
 
-        <div className="toolbar-right">
-          <button onClick={handleDeleteSelected} className="toolbar-btn btn-delete" title="Delete selected nodes or edges">
+          {/* Delete Selection */}
+          <button onClick={handleDeleteSelected} className="toolbar-btn btn-delete" title="Delete selected nodes or edges (Del)">
             <Trash2 size={14} />
-            <span>Delete</span>
           </button>
+
+          {/* Clear Canvas */}
           <button onClick={handleClearCanvas} className="toolbar-btn btn-clear" title="Clear all nodes on canvas">
             <X size={14} />
-            <span>Clear</span>
-          </button>
-          <button onClick={handleResetSample} className="toolbar-btn btn-sample" title="Load sample turbine pipeline">
-            <RefreshCw size={14} />
-            <span>Sample</span>
-          </button>
-          <button onClick={() => fitView({ padding: 0.2 })} className="toolbar-btn btn-fit" title="Fit view to canvas">
-            <ZoomIn size={14} />
-            <span>Fit View</span>
           </button>
         </div>
       </div>
@@ -576,21 +932,7 @@ function CanvasInner() {
         </div>
       )}
 
-      {validationResult && !validationResult.isValid && (
-        <div className="canvas-validation-errors">
-          <div className="val-error-header">
-            <AlertCircle size={16} className="text-red" />
-            <strong>Pipeline Validation Failed ({validationResult.errors.length})</strong>
-            <button onClick={() => setValidationResult(null)} className="notice-close">×</button>
-          </div>
-          <ul className="val-error-list">
-            {validationResult.errors.map((err, i) => (
-              <li key={i}>{err}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
+      {/* React Flow Workspace */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -619,6 +961,50 @@ function CanvasInner() {
         />
         <Background color="#334155" gap={20} size={1.2} />
       </ReactFlow>
+
+      {/* Live Problems Panel (Collapsible Footer Drawer) */}
+      <div className={`canvas-problems-panel ${isProblemsOpen ? 'open' : 'closed'}`}>
+        <div className="problems-header" onClick={() => setIsProblemsOpen(!isProblemsOpen)}>
+          <div className="problems-title-row">
+            {liveProblems.length === 0 ? (
+              <>
+                <CheckCircle2 size={15} className="text-emerald-400" />
+                <span className="problems-badge valid">0 Problems</span>
+                <span className="problems-subtitle">DAG topology verified & ready for execution</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle size={15} className="text-amber-400" />
+                <span className="problems-badge invalid">{liveProblems.length} Problem{liveProblems.length > 1 ? 's' : ''}</span>
+                <span className="problems-subtitle">Fix issues before compiling or activating</span>
+              </>
+            )}
+          </div>
+          <button className="problems-toggle-btn">
+            {isProblemsOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </div>
+
+        {isProblemsOpen && (
+          <div className="problems-body">
+            {liveProblems.length === 0 ? (
+              <div className="problems-empty">
+                <CheckCircle2 size={24} className="text-emerald-400 mb-1" />
+                <p>All nodes and edges conform to the Directed Acyclic Graph (DAG) specification.</p>
+              </div>
+            ) : (
+              <ul className="problems-list">
+                {liveProblems.map((prob, idx) => (
+                  <li key={idx} className="problem-item">
+                    <AlertCircle size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <span>{prob}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Compiler Result Modal */}
       {showCompileModal && compileResult && (
@@ -702,6 +1088,68 @@ function CanvasInner() {
               </button>
               <button onClick={() => setShowJsonModal(false)} className="btn-modal-close">
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Popover Modal */}
+      {showShortcutsModal && (
+        <div className="modal-backdrop" onClick={() => setShowShortcutsModal(false)}>
+          <div className="modal-card shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <Keyboard size={18} className="text-cyan" />
+                <h3>Canvas Keyboard Shortcuts</h3>
+              </div>
+              <button onClick={() => setShowShortcutsModal(false)} className="modal-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="modal-desc">
+              Accelerate your workflow with these keyboard shortcuts:
+            </p>
+
+            <div className="shortcuts-table">
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></div>
+                <div className="shortcut-action">Undo canvas edit</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></div>
+                <div className="shortcut-action">Redo canvas edit</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>D</kbd></div>
+                <div className="shortcut-action">Duplicate selected node</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
+                <div className="shortcut-action">Delete selected node(s) or edge(s)</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>S</kbd></div>
+                <div className="shortcut-action">Save / update graph on server</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>?</kbd></div>
+                <div className="shortcut-action">Toggle this shortcuts cheat sheet</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Scroll</kbd></div>
+                <div className="shortcut-action">Zoom in / out of canvas</div>
+              </div>
+              <div className="shortcut-row">
+                <div className="shortcut-keys"><kbd>Space</kbd> + <kbd>Drag</kbd></div>
+                <div className="shortcut-action">Pan canvas workspace</div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setShowShortcutsModal(false)} className="btn-modal-close">
+                Got it
               </button>
             </div>
           </div>

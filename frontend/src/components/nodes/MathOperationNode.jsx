@@ -26,8 +26,14 @@ export default function MathOperationNode({ id, data, isConnectable }) {
     updateNodeData(id, { ...data, windowSize: Math.max(1, parseInt(e.target.value, 10) || 1) });
   };
 
+  const hasError = !!data.hasError;
+  const errorMessage = data.errorMessage;
+
   return (
-    <div className="flow-node flow-node-math">
+    <div
+      className={`flow-node flow-node-math ${hasError ? 'flow-node-error' : ''}`}
+      title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
+    >
       {/* Input handle on the left */}
       <Handle
         type="target"
@@ -40,9 +46,19 @@ export default function MathOperationNode({ id, data, isConnectable }) {
       <div className="flow-node-header">
         <Cpu size={16} className="text-purple" />
         <span className="flow-node-title">{data.label || 'Math Operation'}</span>
+        {hasError && (
+          <span className="flow-node-error-badge" title={errorMessage}>
+            ⚠️ Config Error
+          </span>
+        )}
       </div>
 
       <div className="flow-node-body">
+        {hasError && (
+          <div className="node-error-callout">
+            {errorMessage}
+          </div>
+        )}
         <div className="node-config-field">
           <label>Operation Type</label>
           <select value={operation} onChange={handleOpChange} className="node-select">

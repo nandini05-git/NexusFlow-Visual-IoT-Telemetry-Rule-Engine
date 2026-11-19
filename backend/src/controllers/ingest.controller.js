@@ -4,14 +4,14 @@ import { telemetryBus } from '../compiler/telemetryBus.js';
 
 const MAX_BATCH_SIZE = 10000;
 
-// Helper to normalize flat or nested payloads
+// Fast shape normalizer for batch and single ingestion
 const normalizeReading = (body) => {
   if (!body || typeof body !== 'object') return null;
 
-  const metadata = body.metadata || {};
-  const deviceId = body.deviceId || metadata.deviceId;
-  const sensorType = body.sensorType || metadata.sensorType;
-  const unit = body.unit !== undefined ? body.unit : (metadata.unit || '');
+  const meta = body.metadata;
+  const deviceId = body.deviceId || (meta && meta.deviceId);
+  const sensorType = body.sensorType || (meta && meta.sensorType);
+  const unit = body.unit !== undefined ? body.unit : (meta && meta.unit) || '';
   const rawValue = body.value;
   const numericValue =
     typeof rawValue === 'number'
@@ -20,11 +20,15 @@ const normalizeReading = (body) => {
       ? Number(rawValue)
       : undefined;
 
+  if (!deviceId || !sensorType || numericValue === undefined) {
+    return null;
+  }
+
   return {
     metadata: {
-      deviceId: deviceId !== undefined && deviceId !== null ? String(deviceId).trim() : undefined,
-      sensorType: sensorType !== undefined && sensorType !== null ? String(sensorType).trim() : undefined,
-      unit: unit !== undefined && unit !== null ? String(unit).trim() : '',
+      deviceId: typeof deviceId === 'string' ? deviceId.trim() : String(deviceId),
+      sensorType: typeof sensorType === 'string' ? sensorType.trim() : String(sensorType),
+      unit: typeof unit === 'string' ? unit.trim() : String(unit),
     },
     value: numericValue,
     timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
@@ -134,7 +138,7 @@ export const ingestBatch = async (req, res, next) => {
     let partialErrors = [];
 
     try {
-      inserted = await Telemetry.insertMany(docs, { ordered: false });
+      inserted = await Telemetry.insertMany(docs, { ordered: false, lean: true });
     } catch (bulkError) {
       if (bulkError.insertedDocs) {
         inserted = bulkError.insertedDocs;

@@ -28,8 +28,14 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
     updateNodeData(id, { ...data, template: e.target.value });
   };
 
+  const hasError = !!data.hasError;
+  const errorMessage = data.errorMessage;
+
   return (
-    <div className="flow-node flow-node-action">
+    <div
+      className={`flow-node flow-node-action ${hasError ? 'flow-node-error' : ''}`}
+      title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
+    >
       {/* Input handle only (left) */}
       <Handle
         type="target"
@@ -42,9 +48,19 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
       <div className="flow-node-header">
         <Zap size={16} className="text-orange" />
         <span className="flow-node-title">{data.label || 'Action Trigger'}</span>
+        {hasError && (
+          <span className="flow-node-error-badge" title={errorMessage}>
+            ⚠️ Config Error
+          </span>
+        )}
       </div>
 
       <div className="flow-node-body">
+        {hasError && (
+          <div className="node-error-callout">
+            {errorMessage}
+          </div>
+        )}
         <div className="node-config-field">
           <label>Action Dispatcher</label>
           <select value={actionType} onChange={handleActionChange} className="node-select">

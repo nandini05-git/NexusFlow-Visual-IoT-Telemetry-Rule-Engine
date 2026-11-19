@@ -1480,6 +1480,34 @@ code {
 .flow-node-math { border-color: rgba(168, 85, 247, 0.6); }
 .flow-node-action { border-color: rgba(249, 115, 22, 0.6); }
 
+/* Live Node Error Validation Styling */
+.flow-node-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.45) !important;
+}
+
+.flow-node-error-badge {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: 0.02em;
+}
+
+.node-error-callout {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #fca5a5;
+  font-size: 0.72rem;
+  padding: 6px 8px;
+  line-height: 1.3;
+}
+
 .flow-node-header {
   padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -2511,4 +2539,229 @@ code {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.4);
   color: #fca5a5;
+}
+
+/* ============================================================
+   Week 2 Day 3: Canvas Usability, Undo/Redo & Live Problems
+   ============================================================ */
+
+/* Toolbar Button Group for Undo / Redo */
+.toolbar-btn-group {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toolbar-icon-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.toolbar-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+.toolbar-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolbar-icon-btn + .toolbar-icon-btn {
+  border-left: 1px solid var(--border-color);
+}
+
+.template-select {
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  color: #d8b4fe !important;
+}
+
+.btn-duplicate:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.btn-layout:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.btn-shortcuts {
+  color: #cbd5e1;
+}
+
+.btn-shortcuts:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* Collapsible Live Problems Panel */
+.canvas-problems-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #090d16;
+  border-top: 1px solid var(--border-color);
+  z-index: 20;
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.5);
+  transition: max-height 0.25s ease-in-out;
+}
+
+.canvas-problems-panel.closed {
+  max-height: 38px;
+}
+
+.canvas-problems-panel.open {
+  max-height: 220px;
+}
+
+.problems-header {
+  height: 38px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  background: #0f172a;
+}
+
+.problems-header:hover {
+  background: #1e293b;
+}
+
+.problems-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.problems-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.problems-badge.valid {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.problems-badge.invalid {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.problems-subtitle {
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.problems-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.problems-body {
+  padding: 10px 16px;
+  max-height: 175px;
+  overflow-y: auto;
+  background: #070b13;
+}
+
+.problems-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.problems-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.problem-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #ef4444;
+  padding: 6px 10px;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Keyboard Shortcuts Modal */
+.shortcuts-modal {
+  max-width: 500px !important;
+}
+
+.shortcuts-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+kbd {
+  display: inline-block;
+  padding: 3px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  box-shadow: 0 2px 0 #1e293b;
+}
+
+.shortcut-action {
+  font-size: 0.8rem;
+  color: #cbd5e1;
 }

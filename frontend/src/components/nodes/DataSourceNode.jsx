@@ -23,14 +23,30 @@ export default function DataSourceNode({ id, data, isConnectable }) {
     updateNodeData(id, { ...data, sensorType: newSensor, unit: newUnit });
   };
 
+  const hasError = !!data.hasError;
+  const errorMessage = data.errorMessage;
+
   return (
-    <div className="flow-node flow-node-source">
+    <div
+      className={`flow-node flow-node-source ${hasError ? 'flow-node-error' : ''}`}
+      title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
+    >
       <div className="flow-node-header">
         <Database size={16} className="text-cyan" />
         <span className="flow-node-title">{data.label || 'Data Source'}</span>
+        {hasError && (
+          <span className="flow-node-error-badge" title={errorMessage}>
+            ⚠️ Config Error
+          </span>
+        )}
       </div>
 
       <div className="flow-node-body">
+        {hasError && (
+          <div className="node-error-callout">
+            {errorMessage}
+          </div>
+        )}
         <div className="node-config-field">
           <label>Target Device ID</label>
           <input

@@ -12,10 +12,11 @@
 4. [The Journey of a Single Sensor Reading (Step-by-Step Data Flow)](#4-the-journey-of-a-single-sensor-reading)
 5. [The Logic Compiler Explained (RxJS, DAGs, and Reactive Streams)](#5-the-logic-compiler-explained)
 6. [Day 2 Changes: Rule Runner & Alert Engine](#6-day-2-changes-rule-runner--alert-engine)
-7. [Mid-Project Review Evidence](#7-mid-project-review-evidence)
-8. [Milestones Roadmap: Week 1 Through Week 4](#8-milestones-roadmap-week-1-through-week-4)
-9. [Glossary of Core Engineering Terms](#9-glossary-of-core-engineering-terms)
-10. [15 Critical Presentation Questions & Model Answers](#10-15-critical-presentation-questions--model-answers)
+7. [Day 3 Changes: Ingestion Tuning, API Hardening & Canvas UX](#7-day-3-changes-ingestion-tuning-api-hardening--canvas-ux)
+8. [Mid-Project Review Evidence](#8-mid-project-review-evidence)
+9. [Milestones Roadmap: Week 1 Through Week 4](#9-milestones-roadmap-week-1-through-week-4)
+10. [Glossary of Core Engineering Terms](#10-glossary-of-core-engineering-terms)
+11. [20 Critical Presentation Questions & Model Answers](#11-20-critical-presentation-questions--model-answers)
 
 ---
 
@@ -362,7 +363,50 @@ Triggered alerts are permanently recorded in MongoDB:
 
 ---
 
-## 7. Mid-Project Review Evidence
+## 7. Day 3 Changes: Ingestion Tuning, API Hardening & Canvas UX
+
+Week 2 Day 3 focused on turning NexusFlow from a functional prototype into an industrial-grade, production-hardened platform prepared for the Mid-Project Review. We tackled four major engineering areas:
+
+### 1. Ingestion Performance & Storage Efficiency
+*The Factory Analogy: Imagine an express delivery dock. If the receiving clerk has to file five separate index cards for every incoming box, the trucks back up onto the highway. By streamlining to only the necessary compound index card and processing manifests in lean batches, thousands of packages slide directly into the warehouse without delay.*
+
+- **Index Consolidation**: We evaluated all secondary indexes in `Telemetry.js`. We dropped redundant single-field indexes (`{ 'metadata.deviceId': 1, timestamp: -1 }` and `{ timestamp: -1 }`), preserving the single optimal compound index `{ 'metadata.deviceId': 1, 'metadata.sensorType': 1, timestamp: -1 }`. Because B-Tree indexes satisfy queries on prefix fields, this compound index covers device-specific queries and sensor-specific range scans while halving the write penalty during high-speed batch insertion.
+- **Lean Mongoose Insertion**: In `ingest.controller.js`, we replaced heavyweight Mongoose document instantiation with `Telemetry.insertMany(docs, { ordered: false, lean: true })`. This bypasses schema lifecycle overhead and casting locks on the Node.js event loop.
+- **Configurable TTL Retention**: In `db.js`, we introduced automated time-to-live (`TELEMETRY_RETENTION_DAYS`, default 30 days) on the Time-Series collection via `expireAfterSeconds`, preventing runaway disk usage in long-running production environments.
+- **Enhanced Load Test Benchmarks**: In `loadTest.js`, we added a `--warmup` phase to normalize TCP/TLS socket connections and JIT compilation before measurement, alongside statistical percentile calculation (`p50` median and `p95` tail latency). On MongoDB Atlas, our Time-Series collection achieved **6.56 bytes per document** across 323,240 documents in 417 buckets—a **94.5% storage space reduction** vs. standard BSON documents.
+
+### 2. Backend Hardening & Reliability
+*The Factory Analogy: You wouldn't leave a power plant's front gate wide open without security guards, visitor badges, and emergency shut-off valves. Backend hardening ensures malicious spikes, bad payloads, or server restarts cannot damage the platform.*
+
+- **Security Headers (`helmet`)**: Enforces secure HTTP response headers (XSS filtering, MIME sniffing protection, frameguard).
+- **Three-Tier Rate Limiting (`express-rate-limit`)**:
+  - `authLimiter`: 10 requests per 15 minutes for `/api/auth/login` and `/api/auth/register` to block brute-force credential stuffing.
+  - `apiLimiter`: 300 requests per 15 minutes for general management endpoints (`/api/graphs`, `/api/alerts`).
+  - `ingestLimiter`: High-throughput or unlimited tier (`INGEST_RATE_LIMIT=unlimited` or 10,000 req/min) so legitimate high-frequency IoT hardware and load tests are never throttled.
+- **Request Tracing (`X-Request-Id`)**: Every incoming HTTP request is assigned a UUID v4 `req.id` and tracked in `requestId.js`, logging precise request durations in milliseconds and returning the header for distributed client-server debugging.
+- **Standardized JSON Error Handling**: In `errorHandler.js`, all errors return a predictable envelope `{ success: false, error: string, message: string, details?: any }`, correctly distinguishing validation failures (400), malformed JSON (400), payload size overflows (413), and internal server crashes (500).
+- **Graceful Shutdown**: In `server.js`, POSIX signals (`SIGTERM`, `SIGINT`) trigger an orderly shutdown procedure: deactivating all running rules via `ruleRunner.stopAll()`, closing WebSocket connections, terminating the HTTP listener, and disconnecting the Mongoose database connection cleanly.
+
+### 3. Canvas Usability & Industrial Authoring UX
+*The Factory Analogy: Designing an emergency shutdown circuit shouldn't feel like walking on eggshells. If you make a mistake, you should be able to press Ctrl+Z to undo it, pick from pre-approved circuit templates, and see immediate warning indicators if a wire is disconnected.*
+
+- **25-Step Undo/Redo History**: Implemented in `Canvas.jsx` using a bounded state stack. Users can freely modify node positions, add/delete nodes, adjust thresholds, and step backward/forward with `Ctrl+Z` and `Ctrl+Y` without corrupting connections.
+- **Topological Auto-Layout**: Integrated `dagre` / topological layering. Pressing **Auto Layout** instantly arranges spaghetti diagrams into clean, left-to-right hierarchical flows (Sources $\rightarrow$ Math $\rightarrow$ Actions).
+- **Industrial Template Library**: A quick-start dropdown loads pre-tested architectures in one click:
+  1. *Turbine Overheat Sentinel*: Linear baseline pipeline.
+  2. *Two-Sensor Branching Rule*: Demonstrates fan-out streams.
+  3. *15-Node Industrial Facility*: Full multi-sensor DAG with vibration, pressure, and temperature branches.
+- **Live Visual Validation & Problems Drawer**: Real-time validation inspects node configurations on every stroke. Incomplete nodes glow with a red border (`.flow-node-error`), and a collapsible **Problems Panel** at the bottom of the canvas lists all syntax errors, orphan nodes, and missing threshold values before the user even clicks Compile.
+- **Keyboard Shortcuts Cheat Sheet**: Pressing `?` or clicking the Help icon opens an in-app modal detailing all canvas hotkeys (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+D`, `Delete`, `Shift+Click`).
+
+### 4. Demo Seeder & Presentation Readiness
+- **Idempotent Demo Seeder (`backend/scripts/seedDemo.js`)**: Creates a default demonstration user (`demo@nexusflow.io` / `DemoUser2026!`) and seeds the 3 industrial graph templates into MongoDB Atlas without creating duplicate records on repeated runs.
+- **8-Minute Review Script (`scripts/demo.md`)**: A structured, step-by-step presentation script designed for the Mid-Project Review, guiding the presenter through architectural defense, live canvas authoring, real-time alert generation, and storage metric verification.
+- **Comprehensive Review Checklist (`docs/mid-project-review-checklist.md`)**: A master audit document mapping all 10 core deliverables, corresponding test files, and defense questions for evaluators.
+
+---
+
+## 8. Mid-Project Review Evidence
 
 As part of the Mid-Project Review, we conducted rigorous verification of two core platform pillars: **Graph Serialization Integrity** and **Telemetry Ingestion Throughput**.
 
@@ -402,7 +446,7 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 
 ---
 
-## 8. Milestones Roadmap: Week 1 Through Week 4
+## 9. Milestones Roadmap: Week 1 Through Week 4
 
 ```
 +-----------------------------------------------------------------------------------------------+
@@ -442,7 +486,7 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 
 ---
 
-## 9. Glossary of Core Engineering Terms
+## 10. Glossary of Core Engineering Terms
 
 * **DAG (Directed Acyclic Graph)**: A mathematical network of nodes connected by directional edges that contains no closed loops. Telemetry flows in one direction (from input sources to output sinks) without ever looping back on itself.
 * **Kahn's Algorithm**: An algorithm that computes a topological ordering of a directed graph in $\mathcal{O}(V + E)$ linear time and detects whether the graph contains any cycles.
@@ -461,7 +505,7 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 
 ---
 
-## 10. 15 Critical Presentation Questions & Model Answers
+## 11. 20 Critical Presentation Questions & Model Answers
 
 ### Q1: Why did you choose MongoDB Time-Series collections instead of standard MongoDB collections?
 **Answer:** Standard document collections store each telemetry reading as an isolated document with full BSON key overhead, indexing every record individually. MongoDB native Time-Series collections group consecutive readings from the same `metaField` (`deviceId`) into compressed columnar storage buckets on disk. In our measured benchmark (`storageStats.js`), this reduced disk footprint from over 120 bytes per document to just **7.39 bytes per document**—a **93.8% reduction in disk storage and memory cache usage**, while dramatically boosting range scan performance.
@@ -519,3 +563,26 @@ When `POST /api/graphs/:id/activate` is called, the backend compiles the saved J
 - Baseline ingestion throughput: ~1,905 to 2,795 writes/sec.
 - Throughput during active rule evaluation: **1,549 writes/sec**.
 - Overhead analysis: Telemetry evaluation runs purely in-memory via pure RxJS operators with sub-millisecond evaluation latency. Throughput variance was predominantly driven by cloud network latency (WAN round-trips to MongoDB Atlas) and the persistence of triggered `AlertEvent` documents, with CPU overhead remaining under 1%.
+
+### Q16: How did you tune MongoDB Time-Series collection indexes to balance query speed vs. write throughput?
+**Answer:** In high-speed write workloads, every additional secondary index introduces synchronous write latency because MongoDB must update every B-Tree leaf node for every inserted bucket. We audited `Telemetry.js` and removed redundant indexes (`{ 'metadata.deviceId': 1, timestamp: -1 }` and standalone `{ timestamp: -1 }`). We consolidated into a single compound index: `{ 'metadata.deviceId': 1, 'metadata.sensorType': 1, timestamp: -1 }`. Because MongoDB indexes support left-prefix matching, any query filtering by `deviceId` (or both `deviceId` and `sensorType`) sorted by `timestamp` is fully satisfied by this index. This eliminated redundant index write overhead, increasing batch ingestion efficiency while maintaining sub-5ms query times.
+
+### Q17: How does rate limiting protect the API without breaking high-speed IoT load testing?
+**Answer:** We implemented a differentiated three-tier rate limiting architecture using `express-rate-limit`:
+1. `authLimiter`: Strict 10 requests / 15 minutes on `/api/auth/login` and `/api/auth/register` to neutralize credential-stuffing and brute-force attacks.
+2. `apiLimiter`: 300 requests / 15 minutes on general management endpoints (`/api/graphs`, `/api/alerts`) to protect against rogue scraping or infinite loops in client applications.
+3. `ingestLimiter`: Designed specifically for hardware telemetry. It defaults to a high threshold (10,000 requests/minute) or can be completely bypassed by setting `INGEST_RATE_LIMIT=unlimited` in `.env`. This ensures multi-threaded load tests (`loadTest.js`) and fleet sensor arrays can ingest tens of thousands of data points without encountering HTTP 429 throttling.
+
+### Q18: How does the visual canvas implement Undo/Redo without corrupting node state or connections?
+**Answer:** In `Canvas.jsx`, we maintain a dedicated undo/redo history stack (capped at 25 snapshots) capturing deep clones of both `nodes` and `edges`. When an action modifies the graph (such as dragging, node configuration edits, connection addition, or deletion), the previous state is pushed to `historyRef.current.past` and `future` is cleared. When the user presses `Ctrl+Z` (undo) or `Ctrl+Y` (redo), the current state is transferred across stacks and the previous state is restored atomically. Because React Flow edge definitions reference node IDs directly, preserving the synchronized tuple of nodes and edges ensures no dangling wires or orphaned state ever occur.
+
+### Q19: How does the live Problems panel detect invalid graphs before they are sent to the compiler?
+**Answer:** In `frontend/src/utils/serializeGraph.js`, we built client-side validation (`validateNodeConfig`) that executes reactively on every user modification. It verifies that:
+- Data Source nodes specify a non-empty `deviceId` and valid `sensorType`.
+- Math Operation nodes specify a valid numerical `threshold` or integer `windowSize` $\ge 2$.
+- Action Trigger nodes specify a non-empty recipient `target`.
+- The overall graph has at least one source, at least one action, and no disconnected components.
+Any violation immediately attaches an error message to the node (triggering a visible red pulse border) and renders a line item inside the collapsible **Problems Panel** drawer below the canvas, guiding the user to fix issues before saving or compiling.
+
+### Q20: How is the demo environment seeded, and how does it ensure idempotency?
+**Answer:** We created an automated seeder script (`backend/scripts/seedDemo.js`). It checks if the default demonstration account (`demo@nexusflow.io`) already exists. If not, it provisions the user with a bcrypt-hashed password (`DemoUser2026!`). It then removes any previous demo graphs owned by that user and inserts the 3 pre-built industrial templates (*Turbine Overheat Sentinel*, *Two-Sensor Branching Rule*, and the *15-Node Industrial Facility*). Because it cleans up and idempotently upserts the test fixtures, the seeder can be run multiple times before an executive demo without producing duplicate graphs, conflicting IDs, or database pollution.

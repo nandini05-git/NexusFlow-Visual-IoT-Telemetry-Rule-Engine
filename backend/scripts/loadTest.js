@@ -18,6 +18,7 @@ const BASE_URL = getArg('base-url', process.env.API_URL || 'http://localhost:500
 const BATCH_SIZE = parseInt(getArg('batch-size', '1000'), 10);
 const CONCURRENCY = parseInt(getArg('concurrency', '6'), 10);
 const DURATION_SECONDS = parseInt(getArg('duration', '10'), 10);
+const WARMUP_SECONDS = parseInt(getArg('warmup', '0'), 10);
 const API_KEY = getArg('api-key', process.env.INGEST_API_KEY || '');
 
 const DEVICES = ['turbine-01', 'turbine-02', 'compressor-03', 'generator-04', 'pump-05'];
@@ -56,6 +57,7 @@ const runLoadTest = async () => {
   console.log(` Batch Size:           ${BATCH_SIZE.toLocaleString()} readings / request`);
   console.log(` Concurrency:          ${CONCURRENCY} parallel workers`);
   console.log(` Duration Target:      ${DURATION_SECONDS} seconds`);
+  console.log(` Warmup Phase:         ${WARMUP_SECONDS} seconds`);
   console.log(` Target Ingestion:     5,000 writes/sec`);
   console.log('----------------------------------------------------------------');
 
@@ -71,6 +73,27 @@ const runLoadTest = async () => {
     process.exit(1);
   }
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (API_KEY) headers['x-api-key'] = API_KEY;
+
+  // Optional warmup phase
+  if (WARMUP_SECONDS > 0) {
+    console.log(`\n[Warmup] Warming up TCP connections and JIT for ${WARMUP_SECONDS}s...`);
+    const warmupEnd = Date.now() + WARMUP_SECONDS * 1000;
+    while (Date.now() < warmupEnd) {
+      try {
+        await fetch(`${BASE_URL}/api/ingest/batch`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(generateBatch(Math.min(BATCH_SIZE, 100))),
+        });
+      } catch {
+        // Ignore warmup errors
+      }
+    }
+    console.log('[Warmup] Warmup completed.\n');
+  }
+
   console.log('\nStarting high-throughput ingestion load test...\n');
 
   let totalSent = 0;
@@ -78,9 +101,6 @@ const runLoadTest = async () => {
   let failedBatches = 0;
   let totalLatencyMs = 0;
   const latencies = [];
-
-  const headers = { 'Content-Type': 'application/json' };
-  if (API_KEY) headers['x-api-key'] = API_KEY;
 
   const startTime = Date.now();
   const stopTime = startTime + DURATION_SECONDS * 1000;
@@ -139,8 +159,9 @@ const runLoadTest = async () => {
   const writesPerSec = Math.round(totalSent / totalDurationSec);
   const avgLatency = latencies.length > 0 ? Math.round(totalLatencyMs / latencies.length) : 0;
 
-  // Compute p95 latency
+  // Compute p50 and p95 latency
   latencies.sort((a, b) => a - b);
+  const p50Latency = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.5)] : 0;
   const p95Latency = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.95)] : 0;
 
   console.log('\n\n================================================================');
@@ -151,7 +172,8 @@ const runLoadTest = async () => {
   console.log(` Actual Duration:         ${totalDurationSec.toFixed(2)} seconds`);
   console.log(` Achieved Throughput:     ${writesPerSec.toLocaleString()} writes/sec`);
   console.log(` Average Batch Latency:   ${avgLatency} ms`);
-  console.log(` 95th Percentile Latency: ${p95Latency} ms`);
+  console.log(` 50th Percentile (p50):   ${p50Latency} ms`);
+  console.log(` 95th Percentile (p95):   ${p95Latency} ms`);
   console.log('----------------------------------------------------------------');
 
   if (writesPerSec >= 5000) {
@@ -161,7 +183,7 @@ const runLoadTest = async () => {
   }
   console.log('================================================================\n');
 
-  return { totalSent, totalDurationSec, writesPerSec, avgLatency, p95Latency, failedBatches };
+  return { totalSent, totalDurationSec, writesPerSec, avgLatency, p50Latency, p95Latency, failedBatches };
 };
 
 runLoadTest().catch((err) => {

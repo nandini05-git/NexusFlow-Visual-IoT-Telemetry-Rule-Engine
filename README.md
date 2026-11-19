@@ -192,6 +192,14 @@ MONGO_URI=mongodb://localhost:27017/nexusflow # or MongoDB Atlas Replica Set URI
 JWT_SECRET=your_jwt_secret_key_production_random_string_2026
 JWT_EXPIRES_IN=7d
 
+# Optional: Data retention TTL in days for native Time-Series collection (default unset / 0 = disabled)
+TELEMETRY_RETENTION_DAYS=
+
+# Optional: Rate limiting controls (defaults: auth 30/15m, api 1000/15m, ingest unlimited)
+AUTH_RATE_LIMIT=30
+API_RATE_LIMIT=1000
+INGEST_RATE_LIMIT=
+
 # Optional: Set INGEST_API_KEY to enforce x-api-key header on /api/ingest routes. Leave blank for open IoT ingest.
 INGEST_API_KEY=
 ```
@@ -228,15 +236,17 @@ npm run dev
 | :--- | :--- | :--- |
 | `npm run dev` | `nodemon server.js` | Starts backend development server with auto-reload |
 | `npm start` | `node server.js` | Starts backend production server |
-| `npm test` | `testAuth && testIngest && testGraph && compiler.test && test:runner` | Runs full automated test suite |
+| `npm test` | `testAuth && testIngest && testGraph && compiler.test && test:runner && test:hardening` | Runs full automated test suite |
 | `npm run test:compiler`| `node --test tests/compiler.test.js` | Unit tests for RxJS logic compiler (valid, cycles, orphans, thresholds, MA, branches) |
 | `npm run test:runner` | `node --test tests/ruleRunner.test.js` | Unit tests for active rule execution, alert creation, cooldown suppression & error isolation |
+| `npm run test:hardening`| `node --test tests/hardening.test.js` | Unit tests for rate limiting, malformed JSON format { error, details }, request ID & graceful stopAll |
 | `npm run test:graph` | `node scripts/testWeek2Compiler.js` | Full integration test for graph CRUD, cycle rejection, compilation, activation, alert logging & deactivation (14/14 passing) |
 | `npm run test:auth` | `node scripts/testAuth.js` | Validates registration, login, JWT token, and profile routes |
 | `npm run test:ingest` | `node scripts/testIngest.js` | Validates single/batch ingestion, caps, error handling & stats |
 | `npm run mock` | `node scripts/mockSensor.js` | Generates simulated turbine temperature telemetry every 1,000ms |
-| `npm run loadtest` | `node scripts/loadTest.js` | Stress tests ingestion velocity (supports `--duration`, `--batch-size`) |
+| `npm run loadtest` | `node scripts/loadTest.js` | Stress tests ingestion velocity (supports `--duration`, `--batch-size`, `--warmup`) |
 | `npm run storage:stats`| `node scripts/storageStats.js`| Inspects MongoDB Time-Series storage size and bytes/record |
+| Demo Seeder | `node scripts/seedDemo.js` | Idempotently provisions `demo@nexusflow.io` and 3 pre-built industrial templates |
 | Verification | `node scripts/validateGraphProof.js` | Validates complex 15-node DAG against Draft-07 JSON Schema and topological compiler |
 | Benchmark Audit | `node scripts/auditIngestionWithRule.js` | Compares ingestion throughput with and without active RxJS rule evaluation |
 
@@ -295,6 +305,33 @@ npm run dev
 
 ---
 
+## 🎬 Demo Account & Mid-Project Review Walkthrough
+
+For evaluating NexusFlow or presenting the live system, use the pre-built idempotent seeder:
+
+```powershell
+# 1. Seed demo user & 3 industrial rule templates into MongoDB Atlas
+cd backend
+node scripts/seedDemo.js
+
+# 2. Start services (2 terminals)
+# Terminal 1: cd backend; npm run dev
+# Terminal 2: cd frontend; npm run dev
+```
+
+### Review Demo Credentials:
+| Field | Value |
+| :--- | :--- |
+| **Login URL** | `http://localhost:3000/login` |
+| **Email** | `demo@nexusflow.io` |
+| **Password** | `DemoUser2026!` |
+| **Security Scope** | *Demo Account — Non-Production* |
+
+- 📄 **8-Minute Demo Script**: See [**`scripts/demo.md`**](file:///c:/NexusFlow/scripts/demo.md) for step-by-step presentation actions.
+- 📋 **Evaluation Checklist**: See [**`docs/mid-project-review-checklist.md`**](file:///c:/NexusFlow/docs/mid-project-review-checklist.md) for criteria mapping and defense Q&A.
+
+---
+
 ## 🗺️ 4-Week Implementation Roadmap
 
 ### **Week 1: Core Foundation & Telemetry Ingestion**
@@ -335,9 +372,32 @@ npm run dev
   - Categorized palette (Data Sources, Math Operations, Action Triggers) with inline configuration editing.
   - Canvas toolbar: Status badge (`draft` / `active`), dynamic **Activate / Deactivate** button, Save to Server, Load Graph, and Compile Check modal.
   - Dashboard Drawers: **Live Alerts Drawer** (polling `/api/alerts` every 5s with loading, empty, and alert state chips) and **My Graphs Drawer** (open, rename, delete with confirmation).
-- [x] **Mid-Project Review Evidence**:
+- [x] **Mid-Project Review Evidence & Performance Audit**:
   - **Graph Serialization Proof**: Draft-07 JSON Schema (`docs/graph.schema.json`), 7-test Vitest suite (`frontend/src/utils/serializeGraph.test.js`) verifying 15-node DAG serialization, and verification report (`docs/graph-serialization-proof.md`).
-  - **Ingestion Audit**: Storage stats (291k+ docs, 7.39 bytes/doc, ~93.8% compression) and comparative benchmark with active rule (`backend/scripts/auditIngestionWithRule.js`, `docs/ingestion-audit.md`).
+  - **Ingestion Audit**: Storage stats (323k+ docs, 6.56 bytes/doc, ~94.5% compression) and comparative benchmark with active rule (`backend/scripts/auditIngestionWithRule.js`, `docs/ingestion-audit.md`).
+- [x] **Ingestion Performance & Storage Efficiency**:
+  - Compound index streamlining: removed redundant single-field indexes, cutting index write amplification in half.
+  - Lean batch insert path with `ordered: false` and `lean: true`.
+  - Added warmup phase and `p50`/`p95` latency calculation to `loadTest.js`.
+  - Storage stats: **323,240 documents** stored in **6.56 bytes/doc** (**94.5% storage space reduction**).
+  - Optional data retention setting: `TELEMETRY_RETENTION_DAYS` (TTL).
+- [x] **Backend Hardening & Security**:
+  - Helmet security headers, rate limiting (`authLimiter`, `apiLimiter`, `ingestLimiter`), 10MB payload size limits.
+  - Request ID tracing middleware (`X-Request-Id` and duration logging).
+  - Consistent JSON error response format `{ error, details }`.
+  - Graceful shutdown handling `SIGTERM`/`SIGINT` closing active rules, WebSockets, HTTP, and MongoDB cleanly.
+  - Test suite (`tests/hardening.test.js`) passing 5/5 tests.
+- [x] **Canvas Usability & Live Problem Detection**:
+  - Undo/Redo (`Ctrl+Z`, `Ctrl+Y`) with 25-step history stack.
+  - Node duplication (`Ctrl+D`), multi-select delete (`Delete`/`Backspace`).
+  - Topological auto-layout arranging nodes left-to-right by dependency depth.
+  - 3 pre-built industrial templates (Turbine Overheat, Two-Sensor Branching, 15-node Complex DAG).
+  - Live collapsible Problems drawer and red outline/badge highlights on incomplete nodes.
+  - Keyboard shortcuts cheat sheet popover (`?`).
+- [x] **Demo & Review Readiness**:
+  - Idempotent database seeder (`seedDemo.js`) creating `demo@nexusflow.io` and 3 pre-built templates.
+  - 8-minute presentation walkthrough script (`scripts/demo.md`).
+  - Mid-Project Review checklist & defense Q&A (`docs/mid-project-review-checklist.md`).
 
 ### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback**
 - [ ] **WebSocket Telemetry Stream**: Connect incoming sensor telemetry to active WebSocket rooms.

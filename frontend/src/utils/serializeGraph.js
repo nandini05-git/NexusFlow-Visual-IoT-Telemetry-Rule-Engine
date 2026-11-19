@@ -34,19 +34,71 @@ export const serializeGraph = (nodes = [], edges = []) => {
 };
 
 /**
+ * Validates individual node configuration:
+ * Checks required fields per node type.
+ */
+export const validateNodeConfig = (node) => {
+  const issues = [];
+  if (!node || !node.type) return issues;
+  const d = node.data || {};
+
+  if (node.type === 'dataSource') {
+    if (!d.deviceId || !String(d.deviceId).trim()) {
+      issues.push('Target Device ID is required');
+    }
+    if (!d.sensorType || !String(d.sensorType).trim()) {
+      issues.push('Sensor metric type is required');
+    }
+  } else if (node.type === 'mathOperation') {
+    if (!d.operation) {
+      issues.push('Operation type is required');
+    } else if (d.operation === 'threshold') {
+      if (d.thresholdValue === undefined || d.thresholdValue === null || isNaN(Number(d.thresholdValue))) {
+        issues.push('Valid numeric threshold value is required');
+      }
+      if (!d.operator) {
+        issues.push('Comparison operator is required');
+      }
+    } else if (d.operation === 'moving_average') {
+      const win = Number(d.windowSize);
+      if (!Number.isInteger(win) || win < 2) {
+        issues.push('Window size must be an integer >= 2');
+      }
+    }
+  } else if (node.type === 'actionTrigger') {
+    if (!d.actionType) {
+      issues.push('Action dispatcher type is required');
+    } else if (d.actionType === 'sms_alert') {
+      if (!d.target || !String(d.target).trim()) {
+        issues.push('Emergency phone number is required');
+      }
+    } else if (d.actionType === 'webhook') {
+      if (!d.target || !String(d.target).trim()) {
+        issues.push('Webhook endpoint URL is required');
+      }
+    }
+  }
+
+  return issues;
+};
+
+/**
  * Validates the serialized rule graph:
  * - At least one Data Source node
  * - At least one Action Trigger node
+ * - Node configuration validation
  * - No orphan nodes (unconnected nodes)
  * - No cycles (topological cycle check)
  */
 export const validateGraph = (nodes = [], edges = []) => {
   const errors = [];
+  const nodeIssues = {};
 
   if (!nodes || nodes.length === 0) {
     return {
       isValid: false,
       errors: ['Canvas is empty. Add nodes to construct a rule graph.'],
+      nodeIssues: {},
       data: null,
     };
   }
@@ -62,6 +114,16 @@ export const validateGraph = (nodes = [], edges = []) => {
   if (actionTriggers.length === 0) {
     errors.push('Rule graph requires at least one Action Trigger node.');
   }
+
+  // 3. Validate individual node configs
+  nodes.forEach((node) => {
+    const issues = validateNodeConfig(node);
+    if (issues.length > 0) {
+      nodeIssues[node.id] = issues;
+      const label = node.data?.label || node.id;
+      issues.forEach((iss) => errors.push(`[${label}] ${iss}`));
+    }
+  });
 
   // Build degree maps
   const incoming = new Map(nodes.map((n) => [n.id, 0]));
@@ -80,7 +142,7 @@ export const validateGraph = (nodes = [], edges = []) => {
     }
   });
 
-  // 3. Check orphan nodes
+  // 4. Check orphan nodes
   nodes.forEach((node) => {
     const nodeLabel = node.data?.label || node.id;
     const inDeg = incoming.get(node.id) || 0;

@@ -11,16 +11,28 @@ export const verifyTimeSeriesCollection = async (connection) => {
     const db = connection.db;
     const collections = await db.listCollections({ name: 'telemetries' }).toArray();
 
+    // Check optional retention / TTL setting via env
+    const retentionDays = parseInt(process.env.TELEMETRY_RETENTION_DAYS, 10);
+    const expireAfterSeconds =
+      Number.isFinite(retentionDays) && retentionDays > 0 ? retentionDays * 86400 : undefined;
+
+    const timeseriesOptions = {
+      timeField: 'timestamp',
+      metaField: 'metadata',
+      granularity: 'seconds',
+    };
+
     if (collections.length === 0) {
       try {
         await db.createCollection('telemetries', {
-          timeseries: {
-            timeField: 'timestamp',
-            metaField: 'metadata',
-            granularity: 'seconds',
-          },
+          timeseries: timeseriesOptions,
+          ...(expireAfterSeconds ? { expireAfterSeconds } : {}),
         });
-        console.log('[MongoDB] Created native Time-Series collection: "telemetries" (timeField: timestamp, metaField: metadata, granularity: seconds)');
+        console.log(
+          `[MongoDB] Created native Time-Series collection: "telemetries" (timeField: timestamp, metaField: metadata, granularity: seconds${
+            expireAfterSeconds ? `, TTL: ${retentionDays}d` : ''
+          })`
+        );
       } catch (createErr) {
         if (createErr.code === 48 || createErr.codeName === 'NamespaceExists') {
           console.log('[MongoDB] Collection "telemetries" already initialized.');
@@ -35,6 +47,16 @@ export const verifyTimeSeriesCollection = async (connection) => {
         `[MongoDB] Verified collection "telemetries": type="${coll.type || 'normal'}", isTimeSeries=${isTimeSeries}`,
         coll.options?.timeseries ? JSON.stringify(coll.options.timeseries) : ''
       );
+
+      // If retention is configured, apply collMod if needed
+      if (expireAfterSeconds) {
+        try {
+          await db.command({ collMod: 'telemetries', expireAfterSeconds });
+          console.log(`[MongoDB] Applied TTL retention: ${retentionDays} days (${expireAfterSeconds}s) to "telemetries"`);
+        } catch (ttlErr) {
+          console.warn('[MongoDB] Notice applying TTL retention setting:', ttlErr.message);
+        }
+      }
     }
   } catch (err) {
     console.warn('[MongoDB] Collection verification check error:', err.message);
