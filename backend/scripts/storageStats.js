@@ -13,8 +13,7 @@ import Telemetry from '../src/models/Telemetry.js';
 
 dotenv.config();
 
-const MONGO_URI =
-  process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
 
 const runStorageStats = async () => {
   console.log('================================================================');
@@ -30,12 +29,12 @@ const runStorageStats = async () => {
     const db = mongoose.connection.db;
 
     // Check collection type
-    const collections = await db
-      .listCollections({ name: 'telemetries' })
-      .toArray();
+    const collections = await db.listCollections({ name: 'telemetries' }).toArray();
 
     if (collections.length === 0) {
-      console.warn(' Collection "telemetries" does not exist yet. Run loadtest or mock sensor first.');
+      console.warn(
+        ' Collection "telemetries" does not exist yet. Run loadtest or mock sensor first.'
+      );
       await mongoose.disconnect();
       return;
     }
@@ -53,9 +52,7 @@ const runStorageStats = async () => {
     let totalIndexSizeBytes = 0;
 
     try {
-      bucketCount = await db
-        .collection('system.buckets.telemetries')
-        .countDocuments();
+      bucketCount = await db.collection('system.buckets.telemetries').countDocuments();
 
       const stats = await db.command({ collStats: 'system.buckets.telemetries' });
       sizeBytes = stats.size || 0;
@@ -81,7 +78,12 @@ const runStorageStats = async () => {
     const standardEstimatedMB = (standardEstimatedBytes / (1024 * 1024)).toFixed(2);
     const savingsPercentage =
       standardEstimatedBytes > 0 && storageSizeBytes > 0
-        ? Math.max(0, (((standardEstimatedBytes - storageSizeBytes) / standardEstimatedBytes) * 100).toFixed(1))
+        ? Math.max(
+            0,
+            (((standardEstimatedBytes - storageSizeBytes) / standardEstimatedBytes) * 100).toFixed(
+              1
+            )
+          )
         : '0';
 
     console.log('\n----------------------------------------------------------------');
@@ -95,14 +97,20 @@ const runStorageStats = async () => {
     console.log('----------------------------------------------------------------');
     console.log(` Total Telemetry Records:     ${totalDocs.toLocaleString()} documents`);
     console.log(` Underlying Storage Buckets:  ${bucketCount.toLocaleString()} buckets`);
-    console.log(` Data Size (Uncompressed):    ${uncompressedMB} MB (${sizeBytes.toLocaleString()} bytes)`);
-    console.log(` Storage Size (On Disk):      ${storageMB} MB (${storageSizeBytes.toLocaleString()} bytes)`);
+    console.log(
+      ` Data Size (Uncompressed):    ${uncompressedMB} MB (${sizeBytes.toLocaleString()} bytes)`
+    );
+    console.log(
+      ` Storage Size (On Disk):      ${storageMB} MB (${storageSizeBytes.toLocaleString()} bytes)`
+    );
     console.log(` Index Size:                  ${indexMB} MB`);
     console.log('----------------------------------------------------------------');
     console.log(` Avg Logical Bytes / Record:  ${avgLogicalBytes} bytes`);
     console.log(` Avg On-Disk Bytes / Record:  ${avgDiskBytes} bytes`);
     console.log(` Conventional MongoDB Size:   ~${standardEstimatedMB} MB (at ~120 bytes/doc)`);
-    console.log(` Storage Space Reduction:     ~${savingsPercentage}% savings via native bucket compression`);
+    console.log(
+      ` Storage Space Reduction:     ~${savingsPercentage}% savings via native bucket compression`
+    );
     console.log('================================================================\n');
 
     await mongoose.disconnect();

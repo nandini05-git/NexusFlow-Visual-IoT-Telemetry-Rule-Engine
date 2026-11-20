@@ -25,7 +25,10 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
           }
         } catch (error) {
-          console.warn('Session expired or invalid token:', error.response?.data?.message || error.message);
+          console.warn(
+            'Session expired or invalid token:',
+            error.response?.data?.message || error.message
+          );
           localStorage.removeItem('nexusflow_token');
           setToken(null);
           setUser(null);

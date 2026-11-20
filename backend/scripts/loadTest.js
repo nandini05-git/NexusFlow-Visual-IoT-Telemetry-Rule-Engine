@@ -66,9 +66,11 @@ const runLoadTest = async () => {
     const health = await fetch(`${BASE_URL}/api/health`).then((r) => r.json());
     console.log(` Server Status:       ${health.status.toUpperCase()} (DB: ${health.database})`);
     if (health.database !== 'connected') {
-      console.warn(' WARNING: Backend reports database disconnected. Results may reflect in-memory or failure.');
+      console.warn(
+        ' WARNING: Backend reports database disconnected. Results may reflect in-memory or failure.'
+      );
     }
-  } catch (err) {
+  } catch {
     console.error(` ERROR: Cannot connect to target server at ${BASE_URL}. Is backend running?`);
     process.exit(1);
   }
@@ -129,7 +131,9 @@ const runLoadTest = async () => {
         } else {
           failedBatches++;
           const errText = await res.text();
-          console.warn(`[Worker ${workerId}] Batch rejected HTTP ${res.status}: ${errText.substring(0, 100)}`);
+          console.warn(
+            `[Worker ${workerId}] Batch rejected HTTP ${res.status}: ${errText.substring(0, 100)}`
+          );
         }
       } catch (err) {
         failedBatches++;
@@ -148,7 +152,9 @@ const runLoadTest = async () => {
   const progressInterval = setInterval(() => {
     const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
     const currentRate = Math.round(totalSent / (elapsedSec || 1));
-    process.stdout.write(` -> Elapsed: ${elapsedSec}s | Sent: ${totalSent.toLocaleString()} records | Rate: ${currentRate.toLocaleString()} writes/sec\r`);
+    process.stdout.write(
+      ` -> Elapsed: ${elapsedSec}s | Sent: ${totalSent.toLocaleString()} records | Rate: ${currentRate.toLocaleString()} writes/sec\r`
+    );
   }, 1000);
 
   await Promise.all(workers);
@@ -183,7 +189,15 @@ const runLoadTest = async () => {
   }
   console.log('================================================================\n');
 
-  return { totalSent, totalDurationSec, writesPerSec, avgLatency, p50Latency, p95Latency, failedBatches };
+  return {
+    totalSent,
+    totalDurationSec,
+    writesPerSec,
+    avgLatency,
+    p50Latency,
+    p95Latency,
+    failedBatches,
+  };
 };
 
 runLoadTest().catch((err) => {

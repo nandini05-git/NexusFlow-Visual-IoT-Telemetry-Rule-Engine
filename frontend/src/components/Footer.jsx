@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, Github, Heart } from 'lucide-react';
+import { Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Footer() {
@@ -14,7 +14,8 @@ export default function Footer() {
             <span className="footer-brand-name">NexusFlow</span>
           </div>
           <p className="footer-tagline">
-            Visual IoT Telemetry & Rule Engine — High-speed MongoDB Time-Series ingestion with reactive node pipelines.
+            Visual IoT Telemetry & Rule Engine — High-speed MongoDB Time-Series ingestion with
+            reactive node pipelines.
           </p>
         </div>
 
@@ -29,7 +30,11 @@ export default function Footer() {
             <h4>Resources</h4>
             <Link to="/login">Sign In</Link>
             <Link to="/register">Create Account</Link>
-            <a href="https://github.com/nandini05-git/NexusFlow-Visual-IoT-Telemetry-Rule-Engine" target="_blank" rel="noreferrer">
+            <a
+              href="https://github.com/nandini05-git/NexusFlow-Visual-IoT-Telemetry-Rule-Engine"
+              target="_blank"
+              rel="noreferrer"
+            >
               GitHub Repository
             </a>
           </div>

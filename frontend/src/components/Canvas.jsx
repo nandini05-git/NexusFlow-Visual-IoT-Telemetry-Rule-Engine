@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -28,7 +28,6 @@ import {
   Save,
   Download,
   Trash2,
-  RefreshCw,
   AlertCircle,
   CheckCircle2,
   Copy,
@@ -37,8 +36,6 @@ import {
   Code2,
   ZoomIn,
   PlayCircle,
-  FolderOpen,
-  FileCheck,
   Loader2,
   Activity,
   Power,
@@ -46,12 +43,9 @@ import {
   Undo2,
   Redo2,
   LayoutGrid,
-  HelpCircle,
   Keyboard,
   ChevronDown,
   ChevronUp,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 
 const defaultInitialNodes = [
@@ -158,18 +152,18 @@ function CanvasInner() {
   /**
    * Push current state to past history snapshot
    */
-  const pushHistory = useCallback(
-    (newNodes, newEdges) => {
-      setHistory((prev) => ({
-        past: [
-          ...prev.past.slice(-25), // Keep max 25 history states
-          { nodes: JSON.parse(JSON.stringify(newNodes)), edges: JSON.parse(JSON.stringify(newEdges)) },
-        ],
-        future: [],
-      }));
-    },
-    []
-  );
+  const pushHistory = useCallback((newNodes, newEdges) => {
+    setHistory((prev) => ({
+      past: [
+        ...prev.past.slice(-25), // Keep max 25 history states
+        {
+          nodes: JSON.parse(JSON.stringify(newNodes)),
+          edges: JSON.parse(JSON.stringify(newEdges)),
+        },
+      ],
+      future: [],
+    }));
+  }, []);
 
   /**
    * Undo last edit
@@ -307,7 +301,9 @@ function CanvasInner() {
   const onConnect = useCallback(
     (params) => {
       if (!isValidConnection(params)) {
-        setConnectionNotice('Invalid link: Follow Data Source -> Math Operation -> Action Trigger flow.');
+        setConnectionNotice(
+          'Invalid link: Follow Data Source -> Math Operation -> Action Trigger flow.'
+        );
         setTimeout(() => setConnectionNotice(null), 4000);
         return;
       }
@@ -385,7 +381,10 @@ function CanvasInner() {
     pushHistory(nodes, edges);
     setNodes((nds) => nds.filter((node) => !node.selected));
     setEdges((eds) => eds.filter((edge) => !edge.selected));
-    showToast('success', `Deleted ${selectedNodes.length} node(s) and ${selectedEdges.length} connection(s).`);
+    showToast(
+      'success',
+      `Deleted ${selectedNodes.length} node(s) and ${selectedEdges.length} connection(s).`
+    );
   }, [nodes, edges, setNodes, setEdges, pushHistory, showToast]);
 
   // Duplicate Selected Node(s)
@@ -414,9 +413,7 @@ function CanvasInner() {
     }));
 
     // Deselect original nodes and append clones
-    setNodes((nds) =>
-      nds.map((n) => (n.selected ? { ...n, selected: false } : n)).concat(clones)
-    );
+    setNodes((nds) => nds.map((n) => (n.selected ? { ...n, selected: false } : n)).concat(clones));
     showToast('success', `Duplicated ${clones.length} node(s).`);
   }, [nodes, edges, setNodes, pushHistory, showToast]);
 
@@ -499,7 +496,11 @@ function CanvasInner() {
 
   // Clear canvas
   const handleClearCanvas = useCallback(() => {
-    if (window.confirm('Are you sure you want to clear the canvas? All unsaved nodes and connections will be removed.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to clear the canvas? All unsaved nodes and connections will be removed.'
+      )
+    ) {
       pushHistory(nodes, edges);
       setNodes([]);
       setEdges([]);
@@ -662,7 +663,10 @@ function CanvasInner() {
       if (res.success) {
         setCompileResult(res);
         setShowCompileModal(true);
-        showToast('success', `Compilation Verified: ${res.metadata?.nodeCount} nodes topologically sorted.`);
+        showToast(
+          'success',
+          `Compilation Verified: ${res.metadata?.nodeCount} nodes topologically sorted.`
+        );
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
@@ -686,7 +690,10 @@ function CanvasInner() {
     const currentNodes = getNodes();
     const currentEdges = getEdges();
     const serialized = serializeGraph(currentNodes, currentEdges);
-    downloadGraphJson(serialized, `${graphName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.json`);
+    downloadGraphJson(
+      serialized,
+      `${graphName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.json`
+    );
   }, [getNodes, getEdges, graphName]);
 
   const copyToClipboard = () => {
@@ -748,7 +755,9 @@ function CanvasInner() {
         <div className={`canvas-toast-banner ${toast.type}`}>
           {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="notice-close">×</button>
+          <button onClick={() => setToast(null)} className="notice-close">
+            ×
+          </button>
         </div>
       )}
 
@@ -787,7 +796,9 @@ function CanvasInner() {
             className="toolbar-select template-select"
             title="Load ready-made industrial rule template"
           >
-            <option value="" disabled>Templates...</option>
+            <option value="" disabled>
+              Templates...
+            </option>
             {GRAPH_TEMPLATES.map((tmpl) => (
               <option key={tmpl.id} value={tmpl.id}>
                 ⚡ {tmpl.name}
@@ -838,7 +849,10 @@ function CanvasInner() {
           </button>
 
           {/* Real Server State Status Badge */}
-          <div className={`toolbar-status-badge ${graphStatus}`} title={`Rule state: ${graphStatus}`}>
+          <div
+            className={`toolbar-status-badge ${graphStatus}`}
+            title={`Rule state: ${graphStatus}`}
+          >
             <span className="status-dot" />
             <span>{graphStatus === 'active' ? 'Active' : 'Draft'}</span>
           </div>
@@ -848,7 +862,11 @@ function CanvasInner() {
             onClick={handleToggleActivate}
             disabled={isTogglingActive}
             className={`toolbar-btn ${graphStatus === 'active' ? 'btn-deactivate' : 'btn-activate'}`}
-            title={graphStatus === 'active' ? 'Deactivate rule (stop execution)' : 'Activate rule (compile & run)'}
+            title={
+              graphStatus === 'active'
+                ? 'Deactivate rule (stop execution)'
+                : 'Activate rule (compile & run)'
+            }
           >
             {isTogglingActive ? (
               <Loader2 size={14} className="spin" />
@@ -903,7 +921,11 @@ function CanvasInner() {
           </button>
 
           {/* Inspect / Export JSON */}
-          <button onClick={handleInspectJson} className="toolbar-btn btn-export" title="Inspect Serialized JSON">
+          <button
+            onClick={handleInspectJson}
+            className="toolbar-btn btn-export"
+            title="Inspect Serialized JSON"
+          >
             <Code2 size={14} />
             <span>JSON</span>
           </button>
@@ -912,12 +934,20 @@ function CanvasInner() {
           </button>
 
           {/* Delete Selection */}
-          <button onClick={handleDeleteSelected} className="toolbar-btn btn-delete" title="Delete selected nodes or edges (Del)">
+          <button
+            onClick={handleDeleteSelected}
+            className="toolbar-btn btn-delete"
+            title="Delete selected nodes or edges (Del)"
+          >
             <Trash2 size={14} />
           </button>
 
           {/* Clear Canvas */}
-          <button onClick={handleClearCanvas} className="toolbar-btn btn-clear" title="Clear all nodes on canvas">
+          <button
+            onClick={handleClearCanvas}
+            className="toolbar-btn btn-clear"
+            title="Clear all nodes on canvas"
+          >
             <X size={14} />
           </button>
         </div>
@@ -928,7 +958,9 @@ function CanvasInner() {
         <div className="canvas-notice-banner error">
           <AlertCircle size={15} />
           <span>{connectionNotice}</span>
-          <button onClick={() => setConnectionNotice(null)} className="notice-close">×</button>
+          <button onClick={() => setConnectionNotice(null)} className="notice-close">
+            ×
+          </button>
         </div>
       )}
 
@@ -970,12 +1002,16 @@ function CanvasInner() {
               <>
                 <CheckCircle2 size={15} className="text-emerald-400" />
                 <span className="problems-badge valid">0 Problems</span>
-                <span className="problems-subtitle">DAG topology verified & ready for execution</span>
+                <span className="problems-subtitle">
+                  DAG topology verified & ready for execution
+                </span>
               </>
             ) : (
               <>
                 <AlertCircle size={15} className="text-amber-400" />
-                <span className="problems-badge invalid">{liveProblems.length} Problem{liveProblems.length > 1 ? 's' : ''}</span>
+                <span className="problems-badge invalid">
+                  {liveProblems.length} Problem{liveProblems.length > 1 ? 's' : ''}
+                </span>
                 <span className="problems-subtitle">Fix issues before compiling or activating</span>
               </>
             )}
@@ -990,7 +1026,9 @@ function CanvasInner() {
             {liveProblems.length === 0 ? (
               <div className="problems-empty">
                 <CheckCircle2 size={24} className="text-emerald-400 mb-1" />
-                <p>All nodes and edges conform to the Directed Acyclic Graph (DAG) specification.</p>
+                <p>
+                  All nodes and edges conform to the Directed Acyclic Graph (DAG) specification.
+                </p>
               </div>
             ) : (
               <ul className="problems-list">
@@ -1021,7 +1059,8 @@ function CanvasInner() {
             </div>
 
             <p className="modal-desc">
-              The DAG was parsed, topologically sorted, and converted into reactive RxJS streams with branching via <code>.pipe(share())</code>.
+              The DAG was parsed, topologically sorted, and converted into reactive RxJS streams
+              with branching via <code>.pipe(share())</code>.
             </p>
 
             <div className="json-preview-container">
@@ -1029,7 +1068,10 @@ function CanvasInner() {
                 <div className="json-badge">
                   <Activity size={13} />
                   <span>
-                    Pipeline: {compileResult.metadata?.nodeCount} Nodes • {compileResult.metadata?.edgeCount} Edges • {compileResult.metadata?.dataSources?.length} Inputs • {compileResult.metadata?.actionTriggers?.length} Sinks
+                    Pipeline: {compileResult.metadata?.nodeCount} Nodes •{' '}
+                    {compileResult.metadata?.edgeCount} Edges •{' '}
+                    {compileResult.metadata?.dataSources?.length} Inputs •{' '}
+                    {compileResult.metadata?.actionTriggers?.length} Sinks
                   </span>
                 </div>
               </div>
@@ -1062,23 +1104,25 @@ function CanvasInner() {
             </div>
 
             <p className="modal-desc">
-              Your visual node canvas was compiled into executable JSON. Ready for RxJS stream execution.
+              Your visual node canvas was compiled into executable JSON. Ready for RxJS stream
+              execution.
             </p>
 
             <div className="json-preview-container">
               <div className="json-preview-bar">
                 <div className="json-badge">
                   <Code2 size={13} />
-                  <span>v{savedJsonData.version} • {savedJsonData.nodes.length} Nodes • {savedJsonData.edges.length} Edges</span>
+                  <span>
+                    v{savedJsonData.version} • {savedJsonData.nodes.length} Nodes •{' '}
+                    {savedJsonData.edges.length} Edges
+                  </span>
                 </div>
                 <button onClick={copyToClipboard} className="btn-copy-json">
                   {copied ? <Check size={14} className="text-green" /> : <Copy size={14} />}
                   <span>{copied ? 'Copied!' : 'Copy JSON'}</span>
                 </button>
               </div>
-              <pre className="json-code-block">
-                {JSON.stringify(savedJsonData, null, 2)}
-              </pre>
+              <pre className="json-code-block">{JSON.stringify(savedJsonData, null, 2)}</pre>
             </div>
 
             <div className="modal-footer">
@@ -1108,41 +1152,55 @@ function CanvasInner() {
               </button>
             </div>
 
-            <p className="modal-desc">
-              Accelerate your workflow with these keyboard shortcuts:
-            </p>
+            <p className="modal-desc">Accelerate your workflow with these keyboard shortcuts:</p>
 
             <div className="shortcuts-table">
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Ctrl</kbd> + <kbd>Z</kbd>
+                </div>
                 <div className="shortcut-action">Undo canvas edit</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Ctrl</kbd> + <kbd>Y</kbd>
+                </div>
                 <div className="shortcut-action">Redo canvas edit</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>D</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Ctrl</kbd> + <kbd>D</kbd>
+                </div>
                 <div className="shortcut-action">Duplicate selected node</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Delete</kbd> / <kbd>Backspace</kbd>
+                </div>
                 <div className="shortcut-action">Delete selected node(s) or edge(s)</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>S</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Ctrl</kbd> + <kbd>S</kbd>
+                </div>
                 <div className="shortcut-action">Save / update graph on server</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>?</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>?</kbd>
+                </div>
                 <div className="shortcut-action">Toggle this shortcuts cheat sheet</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Scroll</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Scroll</kbd>
+                </div>
                 <div className="shortcut-action">Zoom in / out of canvas</div>
               </div>
               <div className="shortcut-row">
-                <div className="shortcut-keys"><kbd>Space</kbd> + <kbd>Drag</kbd></div>
+                <div className="shortcut-keys">
+                  <kbd>Space</kbd> + <kbd>Drag</kbd>
+                </div>
                 <div className="shortcut-action">Pan canvas workspace</div>
               </div>
             </div>

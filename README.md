@@ -241,6 +241,9 @@ npm run dev
 | `npm run test:runner` | `node --test tests/ruleRunner.test.js` | Unit tests for active rule execution, alert creation, cooldown suppression & error isolation |
 | `npm run test:hardening`| `node --test tests/hardening.test.js` | Unit tests for rate limiting, malformed JSON format { error, details }, request ID & graceful stopAll |
 | `npm run test:graph` | `node scripts/testWeek2Compiler.js` | Full integration test for graph CRUD, cycle rejection, compilation, activation, alert logging & deactivation (14/14 passing) |
+| `npm run smoke` | `node scripts/e2eSmoke.js` | End-to-end automated smoke test against running server (11/11 passing) |
+| `npm run lint` | `eslint src/ tests/ scripts/` | Code quality linter checking for unused vars and syntax issues |
+| `npm run format` | `prettier --write ...` | Automatic code formatter across backend JavaScript files |
 | `npm run test:auth` | `node scripts/testAuth.js` | Validates registration, login, JWT token, and profile routes |
 | `npm run test:ingest` | `node scripts/testIngest.js` | Validates single/batch ingestion, caps, error handling & stats |
 | `npm run mock` | `node scripts/mockSensor.js` | Generates simulated turbine temperature telemetry every 1,000ms |
@@ -254,8 +257,10 @@ npm run dev
 | Script | Command | Purpose |
 | :--- | :--- | :--- |
 | `npm run dev` | `vite` | Starts Vite React development server on port 3000 |
-| `npm run build` | `vite build` | Compiles production assets into `dist/` |
+| `npm run build` | `vite build` | Compiles production assets into `dist/` with chunk splitting |
 | `npm run preview` | `vite preview` | Previews production build locally |
+| `npm run lint` | `eslint src/` | Code quality linter for React and JSX files |
+| `npm run format` | `prettier --write ...` | Automatic code formatter for frontend React and CSS assets |
 | `npm test` | `vitest run` | Runs Vitest test suite for graph serialization, Draft-07 schema compliance & cycle detection |
 
 ---
@@ -379,7 +384,8 @@ node scripts/seedDemo.js
   - Compound index streamlining: removed redundant single-field indexes, cutting index write amplification in half.
   - Lean batch insert path with `ordered: false` and `lean: true`.
   - Added warmup phase and `p50`/`p95` latency calculation to `loadTest.js`.
-  - Storage stats: **323,240 documents** stored in **6.56 bytes/doc** (**94.5% storage space reduction**).
+  - Storage stats: **555,353 documents** stored in **5.43 bytes/doc** (**95.5% storage space reduction**).
+  - Peak concurrent load test throughput: **22,570 writes/sec** (`p50: 152 ms`, `p95: 340 ms`).
   - Optional data retention setting: `TELEMETRY_RETENTION_DAYS` (TTL).
 - [x] **Backend Hardening & Security**:
   - Helmet security headers, rate limiting (`authLimiter`, `apiLimiter`, `ingestLimiter`), 10MB payload size limits.
@@ -394,17 +400,35 @@ node scripts/seedDemo.js
   - 3 pre-built industrial templates (Turbine Overheat, Two-Sensor Branching, 15-node Complex DAG).
   - Live collapsible Problems drawer and red outline/badge highlights on incomplete nodes.
   - Keyboard shortcuts cheat sheet popover (`?`).
-- [x] **Demo & Review Readiness**:
-  - Idempotent database seeder (`seedDemo.js`) creating `demo@nexusflow.io` and 3 pre-built templates.
-  - 8-minute presentation walkthrough script (`scripts/demo.md`).
-  - Mid-Project Review checklist & defense Q&A (`docs/mid-project-review-checklist.md`).
+- [x] **Day 4 Stabilization & Review Package**:
+  - Automated E2E smoke test script (`backend/scripts/e2eSmoke.js`, `npm run smoke`) verifying 11 execution steps.
+  - ESLint and Prettier configurations for backend and frontend (`npm run lint`, `npm run format`).
+  - Frontend chunk splitting in `vite.config.js` eliminating bundle warnings.
+  - Mobile/laptop responsive layout and focus-visible keyboard accessibility styling in `index.css`.
+  - Axios 401 session expiration interceptor with automatic redirect and user feedback.
+  - Presentation screenshots checklist (`docs/screenshots-checklist.md`).
+  - Release tag marker: `week2-mid-review`.
 
-### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback**
+---
+
+## 📊 Milestone Status Table
+
+| Milestone | Deliverables | Status |
+| :--- | :--- | :---: |
+| **Week 1** | Native MongoDB Time-Series ingestion, REST APIs, React Flow canvas scaffolding, JWT auth, load test | **DONE** |
+| **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (MID-REVIEW READY)** |
+| **Week 3** | WebSocket live telemetry streaming, pulsing wire animations, real-time node badges, live Recharts dashboards | **PLANNED** |
+| **Week 4** | Production alert dispatchers (real Twilio SMS & Webhooks), actuator controls, Docker containerization | **PLANNED** |
+
+---
+
+### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback (Upcoming)**
 - [ ] **WebSocket Telemetry Stream**: Connect incoming sensor telemetry to active WebSocket rooms.
 - [ ] **Live Visual Feedback**: Dynamic pulse animations on React Flow connection edges when telemetry flows through.
 - [ ] **Canvas Real-Time Badges**: Live stream value pills on nodes displaying latest evaluated readings in browser.
+- [ ] **Live Telemetry Dashboards**: Real-time Recharts visual graphs charting incoming metric streams.
 
-### **Week 4: Webhooks, Actuator Alerting & Production Hardening**
+### **Week 4: Webhooks, Actuator Alerting & Production Hardening (Final)**
 - [ ] **Outbound Action Webhooks**: Automated dispatching to external APIs and real SMS services when rules trigger.
 - [ ] **Actuator Controls**: Bi-directional command dispatch to physical IoT edge devices.
 - [ ] **Final Deployment**: Docker containerization, staging deployment, and end-to-end integration polish.

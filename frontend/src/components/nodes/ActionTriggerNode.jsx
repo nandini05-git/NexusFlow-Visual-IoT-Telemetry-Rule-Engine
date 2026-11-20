@@ -1,18 +1,21 @@
 import React from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import { Zap, BellRing, Webhook, MessageSquare } from 'lucide-react';
+import { Zap, Webhook, MessageSquare } from 'lucide-react';
 
 export default function ActionTriggerNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
 
   const actionType = data.actionType || 'sms_alert';
-  const target = data.target || (actionType === 'sms_alert' ? '+1 (555) 019-2834' : 'https://api.iot-dispatch.com/alerts');
+  const target =
+    data.target ||
+    (actionType === 'sms_alert' ? '+1 (555) 019-2834' : 'https://api.iot-dispatch.com/alerts');
   const method = data.method || 'POST';
   const template = data.template || 'ALERT: {{device}} metric breach ({{value}})';
 
   const handleActionChange = (e) => {
     const newType = e.target.value;
-    const defaultTarget = newType === 'sms_alert' ? '+1 (555) 019-2834' : 'https://api.iot-dispatch.com/alerts';
+    const defaultTarget =
+      newType === 'sms_alert' ? '+1 (555) 019-2834' : 'https://api.iot-dispatch.com/alerts';
     updateNodeData(id, { ...data, actionType: newType, target: defaultTarget });
   };
 
@@ -56,11 +59,7 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
       </div>
 
       <div className="flow-node-body">
-        {hasError && (
-          <div className="node-error-callout">
-            {errorMessage}
-          </div>
-        )}
+        {hasError && <div className="node-error-callout">{errorMessage}</div>}
         <div className="node-config-field">
           <label>Action Dispatcher</label>
           <select value={actionType} onChange={handleActionChange} className="node-select">

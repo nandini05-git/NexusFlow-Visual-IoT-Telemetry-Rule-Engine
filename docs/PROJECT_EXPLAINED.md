@@ -433,14 +433,15 @@ How fast does NexusFlow ingest data, how much space does it save on disk, and wh
 
 We executed automated stress tests against our live MongoDB Atlas cloud replica set:
 1. **Native Time-Series Storage Footprint (`backend/scripts/storageStats.js`)**:
-   - **Documents Verified**: 291,535 records.
-   - **Compressed Buckets**: 363 buckets spanning 3,600-second windows.
-   - **Storage Size on Disk**: 2.16 MB.
-   - **Average Footprint**: **7.39 bytes per document**.
-   - **Space Savings**: Standard BSON documents require ~120 bytes each (35 MB total). MongoDB's native columnar compression achieved a **93.8% reduction in on-disk storage**.
-2. **Comparative Ingestion Benchmark (`backend/scripts/auditIngestionWithRule.js`)**:
-   - **Baseline Ingestion (Raw Database Writes)**: 1,905 to 2,795 writes/sec across WAN round-trips to MongoDB Atlas.
-   - **Ingestion with Active RxJS Rule Evaluation**: Evaluated 10,000 documents against an active rule with moving averages and threshold filters. Sustained **1,549 writes/sec** across WAN latency while writing 3 cooldown-throttled alert events to MongoDB.
+   - **Documents Verified**: 555,353 records.
+   - **Compressed Buckets**: 662 buckets spanning 3,600-second windows.
+   - **Storage Size on Disk**: 2.875 MB.
+   - **Average Footprint**: **5.43 bytes per document**.
+   - **Space Savings**: Standard BSON documents require ~120 bytes each (63.56 MB total). MongoDB's native columnar compression achieved a **95.5% reduction in on-disk storage**.
+2. **Comparative Ingestion Benchmark (`backend/scripts/loadTest.js` & `auditIngestionWithRule.js`)**:
+   - **Concurrent Batched Ingestion**: Achieved **22,570 writes/sec** across 228,000 documents in 10.10s with 0 failures (`p50: 152 ms`, `p95: 340 ms`).
+   - **Single-Threaded WAN Latency Floor**: ~1,190 to 2,795 writes/sec across individual public Internet round-trips to remote cloud Atlas.
+   - **Ingestion with Active RxJS Rule Evaluation**: Evaluated 10,000 documents against an active rule with moving averages and threshold filters. Sustained **1,549 writes/sec** across WAN latency while writing cooldown-throttled alert events to MongoDB.
    - **CPU & Memory Impact**: In-memory rule evaluation overhead was negligible (< 1% CPU utilization, +3.5 MB heap delta) because RxJS stream operators process data in-flight without intermediate database queries.
    - **Documentation**: See [**`docs/ingestion-audit.md`**](file:///c:/NexusFlow/docs/ingestion-audit.md).
 
@@ -508,7 +509,7 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 ## 11. 20 Critical Presentation Questions & Model Answers
 
 ### Q1: Why did you choose MongoDB Time-Series collections instead of standard MongoDB collections?
-**Answer:** Standard document collections store each telemetry reading as an isolated document with full BSON key overhead, indexing every record individually. MongoDB native Time-Series collections group consecutive readings from the same `metaField` (`deviceId`) into compressed columnar storage buckets on disk. In our measured benchmark (`storageStats.js`), this reduced disk footprint from over 120 bytes per document to just **7.39 bytes per document**—a **93.8% reduction in disk storage and memory cache usage**, while dramatically boosting range scan performance.
+**Answer:** Standard document collections store each telemetry reading as an isolated document with full BSON key overhead, indexing every record individually. MongoDB native Time-Series collections group consecutive readings from the same `metaField` (`deviceId`) into compressed columnar storage buckets on disk. In our measured benchmark (`storageStats.js`), this reduced disk footprint from over 120 bytes per document to just **5.43 bytes per document**—a **95.5% reduction in disk storage and memory cache usage**, while dramatically boosting range scan performance.
 
 ### Q2: Why compile visual graphs into RxJS streams instead of writing recursive JavaScript `if/else` evaluation loops?
 **Answer:** High-frequency IoT telemetry arrives asynchronously at thousands of readings per second. Recursive loops or repeated database polling cause severe CPU bottlenecks and event loop lag. RxJS is purpose-built for reactive stream architectures: operators like `filter`, `scan`, and `bufferCount` process readings in memory as pure mathematical pipeline stages with near-zero allocation overhead, naturally supporting sliding windows, debouncing, and multi-branch execution.
@@ -525,7 +526,7 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 **Answer:** Our ingestion controllers (`ingestSingle` and `ingestBatch`) enforce strict normalization: `deviceId`, `sensorType`, and a valid numeric `value` are required. Malformed payloads are rejected immediately with HTTP 400. In batch ingestion (`insertMany({ ordered: false })`), valid readings are safely inserted while invalid items are quarantined and returned in the response with line-item error details.
 
 ### Q6: How do you ensure high throughput during heavy load spikes?
-**Answer:** We engineered batch ingestion supporting up to 10,000 readings per request using MongoDB's un-ordered bulk write API (`insertMany({ ordered: false })`). Our load test script (`loadTest.js`) confirmed sustained throughput between **10,000 and 18,000 writes per second** with sub-50ms latencies in local environments and over 2,000 writes/sec over WAN cloud replica sets.
+**Answer:** We engineered batch ingestion supporting up to 10,000 readings per request using MongoDB's un-ordered bulk write API (`insertMany({ ordered: false, lean: true })`). Our load test script (`loadTest.js`) confirmed sustained throughput of **22,570 writes per second** during batched concurrent load testing with 0 failures and sub-200ms average batch latency, and over 1,200 to 2,800 writes/sec across single-worker WAN cloud replica sets.
 
 ### Q7: Why are rule graphs saved in a `draft` status instead of automatically executing immediately?
 **Answer:** Industrial automation requires verification before activation. In Week 2, we separated saving from running. Engineers can save graphs in `draft` mode, click **Compile Check** to verify topological validity, and inspect metadata. Once verified, the engineer clicks **Activate Rule**, transitioning the rule to `active` status and mounting it in the `ruleRunner.js` in-memory engine.

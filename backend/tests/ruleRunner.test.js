@@ -22,7 +22,12 @@ describe('NexusFlow RuleRunner & Alert Engine Test Suite', () => {
         {
           id: 'math-1',
           type: 'mathOperation',
-          data: { label: 'High Temp > 80', operation: 'threshold', operator: '>', thresholdValue: 80 },
+          data: {
+            label: 'High Temp > 80',
+            operation: 'threshold',
+            operator: '>',
+            thresholdValue: 80,
+          },
         },
         {
           id: 'act-1',
@@ -120,7 +125,11 @@ describe('NexusFlow RuleRunner & Alert Engine Test Suite', () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     // Cooldown is 1s, so only the first reading within this burst should create an alert
-    assert.strictEqual(createdAlerts.length, 1, 'Burst stream within cooldown should only trigger once');
+    assert.strictEqual(
+      createdAlerts.length,
+      1,
+      'Burst stream within cooldown should only trigger once'
+    );
 
     // Wait 1.1 seconds for cooldown to expire
     await new Promise((resolve) => setTimeout(resolve, 1100));
@@ -172,7 +181,11 @@ describe('NexusFlow RuleRunner & Alert Engine Test Suite', () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 30));
-    assert.strictEqual(createdAlerts.length, 1, 'Activating twice must not produce duplicate alerts');
+    assert.strictEqual(
+      createdAlerts.length,
+      1,
+      'Activating twice must not produce duplicate alerts'
+    );
   });
 
   it('6. A throwing node or operator error does not break ingestion or other rules', async () => {

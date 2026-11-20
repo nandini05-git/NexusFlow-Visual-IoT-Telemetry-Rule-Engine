@@ -15,7 +15,12 @@ describe('NexusFlow Graph Serialization & Topology Validation Proof', () => {
         id: 'math-1',
         type: 'mathOperation',
         position: { x: 300, y: 100 },
-        data: { label: 'Overheat Threshold', operation: 'threshold', operator: '>', thresholdValue: 80 },
+        data: {
+          label: 'Overheat Threshold',
+          operation: 'threshold',
+          operator: '>',
+          thresholdValue: 80,
+        },
       },
       {
         id: 'action-1',
@@ -47,31 +52,119 @@ describe('NexusFlow Graph Serialization & Topology Validation Proof', () => {
   it('2. Serializes and validates a complex 15-node multi-branching DAG', () => {
     const complexNodes = [
       // 2 Data Sources
-      { id: 'src-temp', type: 'dataSource', position: { x: 0, y: 100 }, data: { label: 'Turbine Temp', deviceId: 'turbine-01', sensorType: 'temperature' } },
-      { id: 'src-vib', type: 'dataSource', position: { x: 0, y: 400 }, data: { label: 'Turbine Vibration', deviceId: 'turbine-01', sensorType: 'vibration' } },
+      {
+        id: 'src-temp',
+        type: 'dataSource',
+        position: { x: 0, y: 100 },
+        data: { label: 'Turbine Temp', deviceId: 'turbine-01', sensorType: 'temperature' },
+      },
+      {
+        id: 'src-vib',
+        type: 'dataSource',
+        position: { x: 0, y: 400 },
+        data: { label: 'Turbine Vibration', deviceId: 'turbine-01', sensorType: 'vibration' },
+      },
 
       // Branch A: Immediate Temp Alert
-      { id: 'math-high-thresh', type: 'mathOperation', position: { x: 250, y: 50 }, data: { label: 'Critical > 90', operation: 'threshold', operator: '>', thresholdValue: 90 } },
-      { id: 'act-sms-crit', type: 'actionTrigger', position: { x: 500, y: 50 }, data: { label: 'Critical SMS', actionType: 'sms_alert', target: '+19998887777' } },
+      {
+        id: 'math-high-thresh',
+        type: 'mathOperation',
+        position: { x: 250, y: 50 },
+        data: { label: 'Critical > 90', operation: 'threshold', operator: '>', thresholdValue: 90 },
+      },
+      {
+        id: 'act-sms-crit',
+        type: 'actionTrigger',
+        position: { x: 500, y: 50 },
+        data: { label: 'Critical SMS', actionType: 'sms_alert', target: '+19998887777' },
+      },
 
       // Branch B: Temp Smoothing & Warning
-      { id: 'math-temp-ma', type: 'mathOperation', position: { x: 250, y: 150 }, data: { label: '5-Sample MA', operation: 'moving_average', windowSize: 5 } },
-      { id: 'math-warn-thresh', type: 'mathOperation', position: { x: 500, y: 150 }, data: { label: 'Warning > 80', operation: 'threshold', operator: '>', thresholdValue: 80 } },
-      { id: 'act-webhook-warn', type: 'actionTrigger', position: { x: 750, y: 150 }, data: { label: 'Warning Webhook', actionType: 'webhook', target: 'https://api.iot/warning' } },
+      {
+        id: 'math-temp-ma',
+        type: 'mathOperation',
+        position: { x: 250, y: 150 },
+        data: { label: '5-Sample MA', operation: 'moving_average', windowSize: 5 },
+      },
+      {
+        id: 'math-warn-thresh',
+        type: 'mathOperation',
+        position: { x: 500, y: 150 },
+        data: { label: 'Warning > 80', operation: 'threshold', operator: '>', thresholdValue: 80 },
+      },
+      {
+        id: 'act-webhook-warn',
+        type: 'actionTrigger',
+        position: { x: 750, y: 150 },
+        data: {
+          label: 'Warning Webhook',
+          actionType: 'webhook',
+          target: 'https://api.iot/warning',
+        },
+      },
 
       // Branch C: Low Temp / Freezing Detection
-      { id: 'math-temp-min', type: 'mathOperation', position: { x: 250, y: 250 }, data: { label: 'Min Temp Window', operation: 'min', windowSize: 10 } },
-      { id: 'math-freeze-thresh', type: 'mathOperation', position: { x: 500, y: 250 }, data: { label: 'Freeze < 15', operation: 'threshold', operator: '<', thresholdValue: 15 } },
-      { id: 'act-freeze-sms', type: 'actionTrigger', position: { x: 750, y: 250 }, data: { label: 'Freeze Alert', actionType: 'sms_alert', target: '+15554443333' } },
+      {
+        id: 'math-temp-min',
+        type: 'mathOperation',
+        position: { x: 250, y: 250 },
+        data: { label: 'Min Temp Window', operation: 'min', windowSize: 10 },
+      },
+      {
+        id: 'math-freeze-thresh',
+        type: 'mathOperation',
+        position: { x: 500, y: 250 },
+        data: { label: 'Freeze < 15', operation: 'threshold', operator: '<', thresholdValue: 15 },
+      },
+      {
+        id: 'act-freeze-sms',
+        type: 'actionTrigger',
+        position: { x: 750, y: 250 },
+        data: { label: 'Freeze Alert', actionType: 'sms_alert', target: '+15554443333' },
+      },
 
       // Branch D: Vibration Peak & Alarm
-      { id: 'math-vib-max', type: 'mathOperation', position: { x: 250, y: 380 }, data: { label: 'Peak Vibration', operation: 'max', windowSize: 5 } },
-      { id: 'math-vib-thresh', type: 'mathOperation', position: { x: 500, y: 380 }, data: { label: 'Vib Alarm > 15', operation: 'threshold', operator: '>', thresholdValue: 15 } },
-      { id: 'act-vib-webhook', type: 'actionTrigger', position: { x: 750, y: 380 }, data: { label: 'Vib Webhook', actionType: 'webhook', target: 'https://api.iot/vibration' } },
+      {
+        id: 'math-vib-max',
+        type: 'mathOperation',
+        position: { x: 250, y: 380 },
+        data: { label: 'Peak Vibration', operation: 'max', windowSize: 5 },
+      },
+      {
+        id: 'math-vib-thresh',
+        type: 'mathOperation',
+        position: { x: 500, y: 380 },
+        data: {
+          label: 'Vib Alarm > 15',
+          operation: 'threshold',
+          operator: '>',
+          thresholdValue: 15,
+        },
+      },
+      {
+        id: 'act-vib-webhook',
+        type: 'actionTrigger',
+        position: { x: 750, y: 380 },
+        data: { label: 'Vib Webhook', actionType: 'webhook', target: 'https://api.iot/vibration' },
+      },
 
       // Branch E: Vibration Accumulator
-      { id: 'math-vib-sum', type: 'mathOperation', position: { x: 250, y: 480 }, data: { label: 'Energy Sum', operation: 'sum', windowSize: 10 } },
-      { id: 'act-vib-log', type: 'actionTrigger', position: { x: 500, y: 480 }, data: { label: 'Audit Log Webhook', actionType: 'webhook', target: 'https://api.iot/audit' } },
+      {
+        id: 'math-vib-sum',
+        type: 'mathOperation',
+        position: { x: 250, y: 480 },
+        data: { label: 'Energy Sum', operation: 'sum', windowSize: 10 },
+      },
+      {
+        id: 'act-vib-log',
+        type: 'actionTrigger',
+        position: { x: 500, y: 480 },
+        data: {
+          label: 'Audit Log Webhook',
+          actionType: 'webhook',
+          target: 'https://api.iot/audit',
+        },
+      },
     ];
 
     const complexEdges = [
@@ -110,14 +203,54 @@ describe('NexusFlow Graph Serialization & Topology Validation Proof', () => {
   // 3. Graph with every supported node type and math operation
   it('3. Supports every node variant: all data sources, math operations, and action triggers', () => {
     const allTypeNodes = [
-      { id: 'src-1', type: 'dataSource', position: { x: 0, y: 0 }, data: { deviceId: 'turbine-01', sensorType: 'temperature' } },
-      { id: 'm-thresh', type: 'mathOperation', position: { x: 200, y: 0 }, data: { operation: 'threshold', operator: '>=', thresholdValue: 50 } },
-      { id: 'm-ma', type: 'mathOperation', position: { x: 400, y: 0 }, data: { operation: 'moving_average', windowSize: 3 } },
-      { id: 'm-sum', type: 'mathOperation', position: { x: 600, y: 0 }, data: { operation: 'sum', windowSize: 5 } },
-      { id: 'm-min', type: 'mathOperation', position: { x: 800, y: 0 }, data: { operation: 'min', windowSize: 5 } },
-      { id: 'm-max', type: 'mathOperation', position: { x: 1000, y: 0 }, data: { operation: 'max', windowSize: 5 } },
-      { id: 'act-sms', type: 'actionTrigger', position: { x: 1200, y: 0 }, data: { actionType: 'sms_alert', target: '+1234567890' } },
-      { id: 'act-web', type: 'actionTrigger', position: { x: 1200, y: 100 }, data: { actionType: 'webhook', target: 'https://api.io/hook' } },
+      {
+        id: 'src-1',
+        type: 'dataSource',
+        position: { x: 0, y: 0 },
+        data: { deviceId: 'turbine-01', sensorType: 'temperature' },
+      },
+      {
+        id: 'm-thresh',
+        type: 'mathOperation',
+        position: { x: 200, y: 0 },
+        data: { operation: 'threshold', operator: '>=', thresholdValue: 50 },
+      },
+      {
+        id: 'm-ma',
+        type: 'mathOperation',
+        position: { x: 400, y: 0 },
+        data: { operation: 'moving_average', windowSize: 3 },
+      },
+      {
+        id: 'm-sum',
+        type: 'mathOperation',
+        position: { x: 600, y: 0 },
+        data: { operation: 'sum', windowSize: 5 },
+      },
+      {
+        id: 'm-min',
+        type: 'mathOperation',
+        position: { x: 800, y: 0 },
+        data: { operation: 'min', windowSize: 5 },
+      },
+      {
+        id: 'm-max',
+        type: 'mathOperation',
+        position: { x: 1000, y: 0 },
+        data: { operation: 'max', windowSize: 5 },
+      },
+      {
+        id: 'act-sms',
+        type: 'actionTrigger',
+        position: { x: 1200, y: 0 },
+        data: { actionType: 'sms_alert', target: '+1234567890' },
+      },
+      {
+        id: 'act-web',
+        type: 'actionTrigger',
+        position: { x: 1200, y: 100 },
+        data: { actionType: 'webhook', target: 'https://api.io/hook' },
+      },
     ];
 
     const allTypeEdges = [
@@ -153,13 +286,22 @@ describe('NexusFlow Graph Serialization & Topology Validation Proof', () => {
 
     const val = validateGraph(cyclicNodes, cyclicEdges);
     expect(val.isValid).toBe(false);
-    expect(val.errors.some((e) => e.toLowerCase().includes('circular') || e.toLowerCase().includes('cycle'))).toBe(true);
+    expect(
+      val.errors.some(
+        (e) => e.toLowerCase().includes('circular') || e.toLowerCase().includes('cycle')
+      )
+    ).toBe(true);
   });
 
   it('4b. Detects and reports orphan nodes', () => {
     const orphanNodes = [
       { id: 's1', type: 'dataSource', position: { x: 0, y: 0 }, data: { label: 'Source 1' } },
-      { id: 'm-lost', type: 'mathOperation', position: { x: 100, y: 0 }, data: { label: 'Floating Processor' } },
+      {
+        id: 'm-lost',
+        type: 'mathOperation',
+        position: { x: 100, y: 0 },
+        data: { label: 'Floating Processor' },
+      },
       { id: 'a1', type: 'actionTrigger', position: { x: 200, y: 0 }, data: { label: 'Alert 1' } },
     ];
 
@@ -194,9 +336,24 @@ describe('NexusFlow Graph Serialization & Topology Validation Proof', () => {
   // 5. Round-trip test: serialize -> deserialize -> serialize produces identical JSON
   it('5. Round-trip serialization idempotency (serialize -> deserialize -> serialize)', () => {
     const initialNodes = [
-      { id: 'src-1', type: 'dataSource', position: { x: 60, y: 150 }, data: { label: 'Turbine Temp', deviceId: 'turbine-01', sensorType: 'temperature' } },
-      { id: 'math-1', type: 'mathOperation', position: { x: 380, y: 150 }, data: { label: 'Threshold', operation: 'threshold', operator: '>', thresholdValue: 80 } },
-      { id: 'act-1', type: 'actionTrigger', position: { x: 720, y: 150 }, data: { label: 'SMS Emergency', actionType: 'sms_alert', target: '+15550192834' } },
+      {
+        id: 'src-1',
+        type: 'dataSource',
+        position: { x: 60, y: 150 },
+        data: { label: 'Turbine Temp', deviceId: 'turbine-01', sensorType: 'temperature' },
+      },
+      {
+        id: 'math-1',
+        type: 'mathOperation',
+        position: { x: 380, y: 150 },
+        data: { label: 'Threshold', operation: 'threshold', operator: '>', thresholdValue: 80 },
+      },
+      {
+        id: 'act-1',
+        type: 'actionTrigger',
+        position: { x: 720, y: 150 },
+        data: { label: 'SMS Emergency', actionType: 'sms_alert', target: '+15550192834' },
+      },
     ];
 
     const initialEdges = [

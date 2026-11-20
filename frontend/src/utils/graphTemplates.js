@@ -6,7 +6,8 @@
 export const templateTurbineOverheat = {
   id: 'template-turbine-overheat',
   name: 'Turbine Overheat Sentinel',
-  description: 'Single-source pipeline smoothing turbine temperature with a 5-reading moving average and triggering emergency SMS when exceeding 85°C.',
+  description:
+    'Single-source pipeline smoothing turbine temperature with a 5-reading moving average and triggering emergency SMS when exceeding 85°C.',
   graph: {
     version: '1.0.0',
     nodes: [
@@ -90,7 +91,8 @@ export const templateTurbineOverheat = {
 export const templateTwoSensorBranching = {
   id: 'template-two-sensor-branching',
   name: 'Two-Sensor Comparison with Branching',
-  description: 'Dual-source pipeline monitoring temperature and vibration with independent multi-branch alerts.',
+  description:
+    'Dual-source pipeline monitoring temperature and vibration with independent multi-branch alerts.',
   graph: {
     version: '1.0.0',
     nodes: [
@@ -186,12 +188,48 @@ export const templateTwoSensorBranching = {
       },
     ],
     edges: [
-      { id: 'e-temp-thresh', source: 'src-temp-dual', target: 'math-temp-thresh', animated: true, style: { stroke: '#38bdf8', strokeWidth: 2 } },
-      { id: 'e-temp-sms', source: 'math-temp-thresh', target: 'act-dual-sms', animated: true, style: { stroke: '#a855f7', strokeWidth: 2 } },
-      { id: 'e-temp-log-branch', source: 'math-temp-thresh', target: 'act-temp-log', animated: true, style: { stroke: '#a855f7', strokeWidth: 2 } },
-      { id: 'e-vib-ma', source: 'src-vib-dual', target: 'math-vib-ma', animated: true, style: { stroke: '#38bdf8', strokeWidth: 2 } },
-      { id: 'e-ma-vibthresh', source: 'math-vib-ma', target: 'math-vib-thresh', animated: true, style: { stroke: '#a855f7', strokeWidth: 2 } },
-      { id: 'e-vibthresh-webhook', source: 'math-vib-thresh', target: 'act-dual-webhook', animated: true, style: { stroke: '#f97316', strokeWidth: 2 } },
+      {
+        id: 'e-temp-thresh',
+        source: 'src-temp-dual',
+        target: 'math-temp-thresh',
+        animated: true,
+        style: { stroke: '#38bdf8', strokeWidth: 2 },
+      },
+      {
+        id: 'e-temp-sms',
+        source: 'math-temp-thresh',
+        target: 'act-dual-sms',
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2 },
+      },
+      {
+        id: 'e-temp-log-branch',
+        source: 'math-temp-thresh',
+        target: 'act-temp-log',
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2 },
+      },
+      {
+        id: 'e-vib-ma',
+        source: 'src-vib-dual',
+        target: 'math-vib-ma',
+        animated: true,
+        style: { stroke: '#38bdf8', strokeWidth: 2 },
+      },
+      {
+        id: 'e-ma-vibthresh',
+        source: 'math-vib-ma',
+        target: 'math-vib-thresh',
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2 },
+      },
+      {
+        id: 'e-vibthresh-webhook',
+        source: 'math-vib-thresh',
+        target: 'act-dual-webhook',
+        animated: true,
+        style: { stroke: '#f97316', strokeWidth: 2 },
+      },
     ],
   },
 };
@@ -199,25 +237,156 @@ export const templateTwoSensorBranching = {
 export const templateComplexIndustrialDAG = {
   id: 'template-complex-industrial-dag',
   name: 'Complex 15-Node Industrial Monitoring DAG',
-  description: 'Enterprise 15-node, 13-edge DAG with 5 distinct processing branches for comprehensive turbine health analysis.',
+  description:
+    'Enterprise 15-node, 13-edge DAG with 5 distinct processing branches for comprehensive turbine health analysis.',
   graph: {
     version: '1.0.0',
     nodes: [
-      { id: 'src-temp', type: 'dataSource', position: { x: 50, y: 100 }, data: { label: 'Turbine Temp Sensor', deviceId: 'turbine-01', sensorType: 'temperature', unit: '°C' } },
-      { id: 'src-vib', type: 'dataSource', position: { x: 50, y: 350 }, data: { label: 'Turbine Vibration Sensor', deviceId: 'turbine-01', sensorType: 'vibration', unit: 'mm/s' } },
-      { id: 'math-crit-thresh', type: 'mathOperation', position: { x: 340, y: 50 }, data: { label: 'Critical Temp (>90°C)', operation: 'threshold', operator: '>', thresholdValue: 90.0 } },
-      { id: 'act-sms-crit', type: 'actionTrigger', position: { x: 630, y: 50 }, data: { label: 'Emergency Evac SMS', actionType: 'sms_alert', target: '+1-911-ALERT', cooldownSeconds: 5 } },
-      { id: 'math-temp-ma', type: 'mathOperation', position: { x: 340, y: 150 }, data: { label: 'Temp Moving Avg (5s)', operation: 'moving_average', windowSize: 5 } },
-      { id: 'math-warn-thresh', type: 'mathOperation', position: { x: 630, y: 150 }, data: { label: 'Warning Filter (>75°C)', operation: 'threshold', operator: '>', thresholdValue: 75.0 } },
-      { id: 'act-webhook-warn', type: 'actionTrigger', position: { x: 920, y: 150 }, data: { label: 'Maintenance Webhook', actionType: 'webhook', target: 'https://maint.corp/warn', cooldownSeconds: 15 } },
-      { id: 'math-temp-min', type: 'mathOperation', position: { x: 340, y: 250 }, data: { label: 'Rolling Min Tracker', operation: 'min' } },
-      { id: 'math-freeze-thresh', type: 'mathOperation', position: { x: 630, y: 250 }, data: { label: 'Sub-Zero Filter (<0°C)', operation: 'threshold', operator: '<', thresholdValue: 0.0 } },
-      { id: 'act-freeze-sms', type: 'actionTrigger', position: { x: 920, y: 250 }, data: { label: 'Anti-Freeze Alarm SMS', actionType: 'sms_alert', target: '+1-FREEZE-ALERT', cooldownSeconds: 30 } },
-      { id: 'math-vib-max', type: 'mathOperation', position: { x: 340, y: 350 }, data: { label: 'Vibration Max Peak', operation: 'max' } },
-      { id: 'math-vib-thresh', type: 'mathOperation', position: { x: 630, y: 350 }, data: { label: 'Vibration Spike (>4.5)', operation: 'threshold', operator: '>', thresholdValue: 4.5 } },
-      { id: 'act-vib-log', type: 'actionTrigger', position: { x: 920, y: 350 }, data: { label: 'Acoustic Diagnostic Log', actionType: 'webhook', target: 'https://log.diagnostics.io', cooldownSeconds: 10 } },
-      { id: 'math-vib-sum', type: 'mathOperation', position: { x: 340, y: 450 }, data: { label: 'Energy Accumulator', operation: 'sum' } },
-      { id: 'act-vib-webhook', type: 'actionTrigger', position: { x: 630, y: 450 }, data: { label: 'Energy Dispatch Webhook', actionType: 'webhook', target: 'https://grid.power/meter', cooldownSeconds: 20 } },
+      {
+        id: 'src-temp',
+        type: 'dataSource',
+        position: { x: 50, y: 100 },
+        data: {
+          label: 'Turbine Temp Sensor',
+          deviceId: 'turbine-01',
+          sensorType: 'temperature',
+          unit: '°C',
+        },
+      },
+      {
+        id: 'src-vib',
+        type: 'dataSource',
+        position: { x: 50, y: 350 },
+        data: {
+          label: 'Turbine Vibration Sensor',
+          deviceId: 'turbine-01',
+          sensorType: 'vibration',
+          unit: 'mm/s',
+        },
+      },
+      {
+        id: 'math-crit-thresh',
+        type: 'mathOperation',
+        position: { x: 340, y: 50 },
+        data: {
+          label: 'Critical Temp (>90°C)',
+          operation: 'threshold',
+          operator: '>',
+          thresholdValue: 90.0,
+        },
+      },
+      {
+        id: 'act-sms-crit',
+        type: 'actionTrigger',
+        position: { x: 630, y: 50 },
+        data: {
+          label: 'Emergency Evac SMS',
+          actionType: 'sms_alert',
+          target: '+1-911-ALERT',
+          cooldownSeconds: 5,
+        },
+      },
+      {
+        id: 'math-temp-ma',
+        type: 'mathOperation',
+        position: { x: 340, y: 150 },
+        data: { label: 'Temp Moving Avg (5s)', operation: 'moving_average', windowSize: 5 },
+      },
+      {
+        id: 'math-warn-thresh',
+        type: 'mathOperation',
+        position: { x: 630, y: 150 },
+        data: {
+          label: 'Warning Filter (>75°C)',
+          operation: 'threshold',
+          operator: '>',
+          thresholdValue: 75.0,
+        },
+      },
+      {
+        id: 'act-webhook-warn',
+        type: 'actionTrigger',
+        position: { x: 920, y: 150 },
+        data: {
+          label: 'Maintenance Webhook',
+          actionType: 'webhook',
+          target: 'https://maint.corp/warn',
+          cooldownSeconds: 15,
+        },
+      },
+      {
+        id: 'math-temp-min',
+        type: 'mathOperation',
+        position: { x: 340, y: 250 },
+        data: { label: 'Rolling Min Tracker', operation: 'min' },
+      },
+      {
+        id: 'math-freeze-thresh',
+        type: 'mathOperation',
+        position: { x: 630, y: 250 },
+        data: {
+          label: 'Sub-Zero Filter (<0°C)',
+          operation: 'threshold',
+          operator: '<',
+          thresholdValue: 0.0,
+        },
+      },
+      {
+        id: 'act-freeze-sms',
+        type: 'actionTrigger',
+        position: { x: 920, y: 250 },
+        data: {
+          label: 'Anti-Freeze Alarm SMS',
+          actionType: 'sms_alert',
+          target: '+1-FREEZE-ALERT',
+          cooldownSeconds: 30,
+        },
+      },
+      {
+        id: 'math-vib-max',
+        type: 'mathOperation',
+        position: { x: 340, y: 350 },
+        data: { label: 'Vibration Max Peak', operation: 'max' },
+      },
+      {
+        id: 'math-vib-thresh',
+        type: 'mathOperation',
+        position: { x: 630, y: 350 },
+        data: {
+          label: 'Vibration Spike (>4.5)',
+          operation: 'threshold',
+          operator: '>',
+          thresholdValue: 4.5,
+        },
+      },
+      {
+        id: 'act-vib-log',
+        type: 'actionTrigger',
+        position: { x: 920, y: 350 },
+        data: {
+          label: 'Acoustic Diagnostic Log',
+          actionType: 'webhook',
+          target: 'https://log.diagnostics.io',
+          cooldownSeconds: 10,
+        },
+      },
+      {
+        id: 'math-vib-sum',
+        type: 'mathOperation',
+        position: { x: 340, y: 450 },
+        data: { label: 'Energy Accumulator', operation: 'sum' },
+      },
+      {
+        id: 'act-vib-webhook',
+        type: 'actionTrigger',
+        position: { x: 630, y: 450 },
+        data: {
+          label: 'Energy Dispatch Webhook',
+          actionType: 'webhook',
+          target: 'https://grid.power/meter',
+          cooldownSeconds: 20,
+        },
+      },
     ],
     edges: [
       { id: 'e1', source: 'src-temp', target: 'math-crit-thresh' },

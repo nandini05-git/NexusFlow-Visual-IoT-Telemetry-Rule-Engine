@@ -42,9 +42,7 @@ router.post(
       .isEmail()
       .withMessage('Please provide a valid email address')
       .normalizeEmail(),
-    body('password')
-      .notEmpty()
-      .withMessage('Password is required'),
+    body('password').notEmpty().withMessage('Password is required'),
   ],
   login
 );

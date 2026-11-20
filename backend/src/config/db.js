@@ -52,7 +52,9 @@ export const verifyTimeSeriesCollection = async (connection) => {
       if (expireAfterSeconds) {
         try {
           await db.command({ collMod: 'telemetries', expireAfterSeconds });
-          console.log(`[MongoDB] Applied TTL retention: ${retentionDays} days (${expireAfterSeconds}s) to "telemetries"`);
+          console.log(
+            `[MongoDB] Applied TTL retention: ${retentionDays} days (${expireAfterSeconds}s) to "telemetries"`
+          );
         } catch (ttlErr) {
           console.warn('[MongoDB] Notice applying TTL retention setting:', ttlErr.message);
         }
@@ -71,14 +73,16 @@ export const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
     });
     console.log(`[MongoDB] Connected successfully: ${conn.connection.host}`);
-    
+
     // Verify native Time-Series collection on startup
     await verifyTimeSeriesCollection(conn.connection);
 
     return conn;
   } catch (error) {
     console.error(`[MongoDB] Connection error: ${error.message}`);
-    console.warn(`[MongoDB] Running without persistent DB connection. Set valid MONGO_URI in .env to persist telemetry.`);
+    console.warn(
+      `[MongoDB] Running without persistent DB connection. Set valid MONGO_URI in .env to persist telemetry.`
+    );
     return null;
   }
 };

@@ -9,10 +9,7 @@ import {
   Zap,
   Activity,
   ArrowRight,
-  ShieldCheck,
-  TrendingUp,
   Server,
-  Code2,
   Workflow,
   Sparkles,
 } from 'lucide-react';
@@ -99,7 +96,9 @@ export default function Landing() {
           </h1>
 
           <p className="hero-subheading">
-            Hardcoding IoT business logic wastes engineering cycles. NexusFlow compiles visual drag-and-drop node pipelines into high-speed event streams running atop native MongoDB Time-Series collections.
+            Hardcoding IoT business logic wastes engineering cycles. NexusFlow compiles visual
+            drag-and-drop node pipelines into high-speed event streams running atop native MongoDB
+            Time-Series collections.
           </p>
 
           <div className="hero-cta-group">
@@ -188,7 +187,8 @@ export default function Landing() {
           <span className="section-eyebrow">Enterprise Capabilities</span>
           <h2 className="section-title">Engineered for Industrial Telemetry</h2>
           <p className="section-desc">
-            Everything your operations team needs to model, ingest, and respond to massive IoT data streams without developer intervention.
+            Everything your operations team needs to model, ingest, and respond to massive IoT data
+            streams without developer intervention.
           </p>
         </div>
 
@@ -252,7 +252,8 @@ export default function Landing() {
           <div className="cta-text">
             <h2>Ready to Automate Your IoT Telemetry?</h2>
             <p>
-              Log into your NexusFlow workspace, configure your rule canvas, and connect your sensors in minutes.
+              Log into your NexusFlow workspace, configure your rule canvas, and connect your
+              sensors in minutes.
             </p>
           </div>
           <div className="cta-buttons">

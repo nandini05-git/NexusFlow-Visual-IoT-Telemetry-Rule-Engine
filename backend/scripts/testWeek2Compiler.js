@@ -58,10 +58,26 @@ const runTests = async () => {
     name: 'Cyclic Graph',
     graph: {
       nodes: [
-        { id: 'src-1', type: 'dataSource', data: { deviceId: 'turbine-01', sensorType: 'temperature' } },
-        { id: 'math-1', type: 'mathOperation', data: { operation: 'threshold', operator: '>', thresholdValue: 50 } },
-        { id: 'math-2', type: 'mathOperation', data: { operation: 'threshold', operator: '>', thresholdValue: 60 } },
-        { id: 'act-1', type: 'actionTrigger', data: { actionType: 'sms_alert', target: '+1234567890' } },
+        {
+          id: 'src-1',
+          type: 'dataSource',
+          data: { deviceId: 'turbine-01', sensorType: 'temperature' },
+        },
+        {
+          id: 'math-1',
+          type: 'mathOperation',
+          data: { operation: 'threshold', operator: '>', thresholdValue: 50 },
+        },
+        {
+          id: 'math-2',
+          type: 'mathOperation',
+          data: { operation: 'threshold', operator: '>', thresholdValue: 60 },
+        },
+        {
+          id: 'act-1',
+          type: 'actionTrigger',
+          data: { actionType: 'sms_alert', target: '+1234567890' },
+        },
       ],
       edges: [
         { id: 'e1', source: 'src-1', target: 'math-1' },
@@ -87,13 +103,19 @@ const runTests = async () => {
     name: 'Orphan Graph',
     graph: {
       nodes: [
-        { id: 'src-1', type: 'dataSource', data: { deviceId: 'turbine-01', sensorType: 'temperature' } },
-        { id: 'act-1', type: 'actionTrigger', data: { actionType: 'sms_alert', target: '+1234567890' } },
+        {
+          id: 'src-1',
+          type: 'dataSource',
+          data: { deviceId: 'turbine-01', sensorType: 'temperature' },
+        },
+        {
+          id: 'act-1',
+          type: 'actionTrigger',
+          data: { actionType: 'sms_alert', target: '+1234567890' },
+        },
         { id: 'math-lost', type: 'mathOperation', data: { operation: 'sum', windowSize: 5 } },
       ],
-      edges: [
-        { id: 'e1', source: 'src-1', target: 'act-1' },
-      ],
+      edges: [{ id: 'e1', source: 'src-1', target: 'act-1' }],
     },
   };
   const orphanRes = await callAPI('/api/graphs', {
@@ -122,7 +144,12 @@ const runTests = async () => {
         {
           id: 'math-thresh',
           type: 'mathOperation',
-          data: { label: 'Overheat > 85', operation: 'threshold', operator: '>', thresholdValue: 85 },
+          data: {
+            label: 'Overheat > 85',
+            operation: 'threshold',
+            operator: '>',
+            thresholdValue: 85,
+          },
         },
         {
           id: 'act-sms',
@@ -163,7 +190,9 @@ const runTests = async () => {
   });
   console.log(` -> Status: ${compileRes.status}`);
   console.log(` -> Message: ${compileRes.data?.message}`);
-  console.log(` -> Topological Order: ${JSON.stringify(compileRes.data?.metadata?.topologicalOrder)}`);
+  console.log(
+    ` -> Topological Order: ${JSON.stringify(compileRes.data?.metadata?.topologicalOrder)}`
+  );
   if (compileRes.status !== 200 || !compileRes.data?.success) {
     throw new Error('Dry-run compile failed');
   }

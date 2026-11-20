@@ -10,7 +10,6 @@ import {
   EyeOff,
   ArrowRight,
   AlertCircle,
-  CheckCircle2,
   Loader2,
 } from 'lucide-react';
 
@@ -220,17 +219,11 @@ export default function Register() {
                 {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {errors.confirmPassword && (
-              <span className="error-text">{errors.confirmPassword}</span>
-            )}
+            {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
           </div>
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            className="auth-submit-btn"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 size={18} className="spin" />

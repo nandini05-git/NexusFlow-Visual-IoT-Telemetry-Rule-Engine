@@ -40,7 +40,8 @@ class RuleRunner {
     // Define Action listener with cooldown & AlertEvent persistence
     const actionListener = async (eventData) => {
       const nodeId = eventData.nodeId || 'action-node';
-      const cooldownSec = eventData.cooldownSeconds !== undefined ? Number(eventData.cooldownSeconds) : 10;
+      const cooldownSec =
+        eventData.cooldownSeconds !== undefined ? Number(eventData.cooldownSeconds) : 10;
       const cooldownMs = Math.max(0, cooldownSec * 1000);
       const cooldownKey = `${idStr}:${nodeId}`;
 
@@ -55,8 +56,10 @@ class RuleRunner {
       this.lastTriggeredTimes.set(cooldownKey, now);
 
       const readingVal = eventData.reading?.value;
-      const deviceId = eventData.reading?.metadata?.deviceId || eventData.reading?.deviceId || 'device';
-      const sensorType = eventData.reading?.metadata?.sensorType || eventData.reading?.sensorType || 'metric';
+      const deviceId =
+        eventData.reading?.metadata?.deviceId || eventData.reading?.deviceId || 'device';
+      const sensorType =
+        eventData.reading?.metadata?.sensorType || eventData.reading?.sensorType || 'metric';
 
       const alertMessage = eventData.template
         ? eventData.template

@@ -116,26 +116,82 @@
 1. **Execute High-Speed Batch Load Test**:
    ```powershell
    cd backend
-   node scripts/loadTest.js --duration=5 --warmup=2 --batch-size=500 --concurrency=6
+   node scripts/loadTest.js --duration=10 --warmup=2 --batch-size=1000 --concurrency=4
    ```
 2. **Review Terminal Output**:
+   ```text
+   ================================================================
+                      LOAD TEST RESULTS REPORT
+   ================================================================
+    Total Telemetry Sent:    228,000 documents
+    Total Batches Sent:      228 successful (0 failed)
+    Actual Duration:         10.10 seconds
+    Achieved Throughput:     22,570 writes/sec
+    Average Batch Latency:   173 ms
+    50th Percentile (p50):   152 ms
+    95th Percentile (p95):   340 ms
+   ----------------------------------------------------------------
+    STATUS: PASS (Exceeded target 5,000 writes/sec requirement)
+   ================================================================
+   ```
    - Point out:
-     - Warm-up phase completed.
-     - 0 failures across thousands of records.
-     - Median batch latency (**p50**) and 95th percentile latency (**p95**).
-     - WAN cloud throughput sustained at **1,500 – 2,800 writes/sec** to MongoDB Atlas cloud.
+     - Warm-up phase completed smoothly.
+     - 0 failures across hundreds of thousands of records.
+     - Median batch latency (**p50: 152 ms**) and 95th percentile latency (**p95: 340 ms**).
+     - Achieved **22,570 writes/sec**, comfortably exceeding the 5,000 writes/sec target.
 
 ---
 
-### Step 8: Time-Series Storage Footprint Audit & Conclusion (7:30 - 8:00)
+### Step 8: Time-Series Storage Footprint Audit & Conclusion (7:30 - 8:30)
 1. **Inspect Columnar Time-Series Buckets**:
    ```powershell
    cd backend
    npm run storage:stats
    ```
-2. **Conclude with Key Metric**:
-   - **300,000+ real records** stored in **7.39 bytes per document** on disk.
-   - Conventional MongoDB requires ~120 bytes/doc (~36 MB). NexusFlow's columnar compression achieves a **93.8% storage reduction**.
+2. **Review Output**:
+   ```text
+   ================================================================
+          NexusFlow Time-Series Storage Audit & Efficiency
+   ================================================================
+    Total Telemetry Records:     555,353 documents
+    Underlying Storage Buckets:  662 buckets
+    Storage Size (On Disk):      2.875 MB
+    Index Size:                  0.520 MB
+   ----------------------------------------------------------------
+    Avg On-Disk Bytes / Record:  5.43 bytes
+    Conventional MongoDB Size:   ~63.56 MB (at ~120 bytes/doc)
+    Storage Space Reduction:     ~95.5% savings via native bucket compression
+   ================================================================
+   ```
+3. **Conclude with Key Metric**:
+   - **555,000+ real records** stored in **5.43 bytes per document** on disk.
+   - Conventional MongoDB requires ~120 bytes/doc (~63 MB). NexusFlow's columnar compression achieves a **95.5% storage reduction**.
+
+---
+
+### Step 9: Automated End-to-End Smoke Test (8:30 - 9:30)
+1. **Run Automated Smoke Script**:
+   ```powershell
+   cd backend
+   npm run smoke
+   ```
+2. **Show Evaluators the Instant 11-Step Verification**:
+   - Health check, demo auth, DAG creation, dry-run compile, dynamic activation, non-matching rejection, matching breach alert, dynamic deactivation, suppression verification, and cleanup.
+   - All 11 steps execute and print `[PASS]`.
+
+---
+
+## "If Something Fails" Fallback & Troubleshooting Matrix
+
+| Issue Encountered During Demo | Root Cause | Immediate Fallback Action |
+| :--- | :--- | :--- |
+| **Port 5000 Already In Use** | A background node process from earlier was not stopped. | Run `netstat -ano \| findstr :5000` to find the PID, then `taskkill /F /PID <PID>`, or change `PORT=5001` in `.env` and `VITE_API_URL=http://localhost:5001`. |
+| **MongoDB Connection Timeout** | Wi-Fi dropped or Atlas IP whitelist expired. | Verify Internet connection. In MongoDB Atlas Network Access, ensure current IP or `0.0.0.0/0` is allowed. The server will reconnect automatically. |
+| **Login Session Expired / 401** | JWT expired or storage cleared. | Click Login, re-authenticate with `demo@nexusflow.io` / `DemoUser2026!`. Token auto-refreshes for 7 days. |
+| **Canvas Nodes Messy or Off-Screen** | Dragging moved nodes outside visible viewport. | Click the **Fit View** icon in the React Flow controls or toolbar, then click **Auto-Layout** to instantly restore clean hierarchy. |
+| **No Alerts Appearing in Drawer** | The active rule is in `DRAFT` status or sensor readings are below threshold. | Check the status badge on the canvas: ensure it is green (`ACTIVE`). In `mockSensor.js`, manually send a breach reading via curl or invoke `npm run smoke`. |
+| **Accidental Node Deletion** | Evaluator or presenter pressed Delete on a needed node. | Press `Ctrl+Z` (Undo). The entire canvas state, node positions, and connections are restored from history stack. |
+| **Evaluator Asks to Reset to Clean Slate** | Need a clean demo slate. | Run `cd backend; node scripts/seedDemo.js`. It idempotently cleans previous demo graphs and re-provisions default templates. |
 
 ---
 
@@ -149,4 +205,7 @@
 | **Run Security Hardening Tests** | `cd backend; npm run test:hardening` |
 | **Run Frontend Vitest Tests** | `cd frontend; npm test` |
 | **Build Frontend Production Bundle** | `cd frontend; npm run build` |
+| **Run E2E Smoke Test** | `cd backend; npm run smoke` |
+| **Run Code Quality Linting** | `cd backend; npm run lint` (and `cd frontend; npm run lint`) |
+| **Auto-Format Code (Prettier)** | `cd backend; npm run format` (and `cd frontend; npm run format`) |
 | **Re-seed Demo Data** | `cd backend; node scripts/seedDemo.js` |

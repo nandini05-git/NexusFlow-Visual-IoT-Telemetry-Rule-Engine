@@ -42,11 +42,7 @@ export default function DataSourceNode({ id, data, isConnectable }) {
       </div>
 
       <div className="flow-node-body">
-        {hasError && (
-          <div className="node-error-callout">
-            {errorMessage}
-          </div>
-        )}
+        {hasError && <div className="node-error-callout">{errorMessage}</div>}
         <div className="node-config-field">
           <label>Target Device ID</label>
           <input
@@ -72,7 +68,9 @@ export default function DataSourceNode({ id, data, isConnectable }) {
 
         <div className="node-status-bar">
           <Radio size={12} className="pulse-icon text-cyan" />
-          <span>Stream: {deviceId} ({sensorType})</span>
+          <span>
+            Stream: {deviceId} ({sensorType})
+          </span>
         </div>
       </div>
 

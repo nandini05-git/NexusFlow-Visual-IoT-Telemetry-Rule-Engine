@@ -5,10 +5,7 @@ export const requireAuth = async (req, res, next) => {
   try {
     let token = null;
 
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer ')
-    ) {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
     }
 
@@ -19,7 +16,8 @@ export const requireAuth = async (req, res, next) => {
       });
     }
 
-    const secret = process.env.JWT_SECRET || 'nexusflow_jwt_secret_key_production_random_string_2026';
+    const secret =
+      process.env.JWT_SECRET || 'nexusflow_jwt_secret_key_production_random_string_2026';
     let decoded;
 
     try {

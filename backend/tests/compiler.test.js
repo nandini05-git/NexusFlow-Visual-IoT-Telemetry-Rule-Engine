@@ -128,7 +128,12 @@ describe('NexusFlow Logic Compiler Test Suite', () => {
         {
           id: 'math-orphan',
           type: 'mathOperation',
-          data: { label: 'Floating Filter', operation: 'threshold', operator: '>', thresholdValue: 50 },
+          data: {
+            label: 'Floating Filter',
+            operation: 'threshold',
+            operator: '>',
+            thresholdValue: 50,
+          },
         },
         {
           id: 'action-1',
@@ -136,9 +141,7 @@ describe('NexusFlow Logic Compiler Test Suite', () => {
           data: { actionType: 'sms_alert', target: '+123456789' },
         },
       ],
-      edges: [
-        { id: 'e1', source: 'source-1', target: 'action-1' },
-      ],
+      edges: [{ id: 'e1', source: 'source-1', target: 'action-1' }],
     };
 
     assert.throws(

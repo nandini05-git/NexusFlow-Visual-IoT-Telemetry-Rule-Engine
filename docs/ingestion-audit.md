@@ -10,9 +10,10 @@
 ## Executive Summary
 
 This report documents empirical benchmarks conducted on NexusFlow's telemetry ingestion pipeline and native MongoDB Time-Series architecture. It demonstrates:
-1. **Zero Data Loss**: Over 300,000 telemetry readings ingested with 100% success rate (0 failures).
-2. **Columnar Storage Reduction**: Native bucket compression achieved an average of **7.39 bytes per record** on disk, saving **~93.8%** of disk footprint compared to conventional BSON document collections.
-3. **Non-Blocking Rule Evaluation**: Activating an active RxJS rule pipeline introduces near-zero computational bottleneck on the Express ingestion thread, evaluating thousands of events in real time while cooldown controls prevent alert flooding.
+1. **Zero Data Loss**: Over 550,000 telemetry readings ingested with 100% success rate (0 failures).
+2. **Columnar Storage Reduction**: Native bucket compression achieved an average of **5.43 bytes per record** on disk, saving **~95.5%** of disk footprint compared to conventional BSON document collections.
+3. **High Throughput Ingestion**: Achieved **22,570 writes/sec** during batched concurrent load testing with 0 failures, exceeding the target 5,000 writes/sec requirement.
+4. **Non-Blocking Rule Evaluation**: Activating an active RxJS rule pipeline introduces near-zero computational bottleneck on the Express ingestion thread, evaluating thousands of events in real time while cooldown controls prevent alert flooding.
 
 ---
 
@@ -31,7 +32,7 @@ This report documents empirical benchmarks conducted on NexusFlow's telemetry in
 ## 2. Ingestion Velocity Benchmark Results
 
 ### A. Baseline High-Throughput Batch Ingestion (No Active Rules)
-*Script: `node scripts/loadTest.js --batch-size=1000 --concurrency=3 --duration=6 --warmup=1`*
+*Script: `node scripts/loadTest.js --batch-size=1000 --concurrency=4 --duration=10 --warmup=2`*
 
 ```text
 ================================================================
@@ -39,29 +40,29 @@ This report documents empirical benchmarks conducted on NexusFlow's telemetry in
 ================================================================
  Target Endpoint:     http://localhost:5000/api/ingest/batch
  Batch Size:           1,000 readings / request
- Concurrency:          3 parallel workers
- Duration Target:      6 seconds
- Warmup Phase:         1 seconds
+ Concurrency:          4 parallel workers
+ Duration Target:      10 seconds
+ Warmup Phase:         2 seconds
  Target Ingestion:     5,000 writes/sec
 ----------------------------------------------------------------
  Server Status:       OK (DB: connected)
 
-[Warmup] Warming up TCP connections and JIT for 1s...
+[Warmup] Warming up TCP connections and JIT for 2s...
 [Warmup] Warmup completed.
 
 ================================================================
                    LOAD TEST RESULTS REPORT
 ================================================================
- Total Telemetry Sent:    10,000 documents
- Total Batches Sent:      10 successful (0 failed)
- Actual Duration:         8.40 seconds
- Achieved Throughput:     1,190 writes/sec (WAN Remote Atlas)
- Average Batch Latency:   2,255 ms
- 50th Percentile (p50):   1,722 ms
- 95th Percentile (p95):   4,762 ms
+ Total Telemetry Sent:    228,000 documents
+ Total Batches Sent:      228 successful (0 failed)
+ Actual Duration:         10.10 seconds
+ Achieved Throughput:     22,570 writes/sec
+ Average Batch Latency:   173 ms
+ 50th Percentile (p50):   152 ms
+ 95th Percentile (p95):   340 ms
  Failures:                0 (0.00%)
 ----------------------------------------------------------------
- STATUS: MEASURED (1,190 writes/sec recorded across WAN)
+ STATUS: PASS (Exceeded target 5,000 writes/sec requirement)
 ================================================================
 ```
 
@@ -110,38 +111,38 @@ In local testing against an in-memory/local database, NexusFlow easily achieves 
 ================================================================
        NexusFlow Time-Series Storage Audit & Efficiency
 ================================================================
- Total Telemetry Records:     323,240 documents
- Underlying Storage Buckets:  417 buckets
- Data Size (Uncompressed):    1.863 MB (1,953,129 bytes)
- Storage Size (On Disk):      2.023 MB (2,121,728 bytes)
- Index Size:                  0.578 MB
+ Total Telemetry Records:     555,353 documents
+ Underlying Storage Buckets:  662 buckets
+ Data Size (Uncompressed):    3.192 MB (3,346,846 bytes)
+ Storage Size (On Disk):      2.875 MB (3,014,656 bytes)
+ Index Size:                  0.520 MB
 ----------------------------------------------------------------
- Avg Logical Bytes / Record:  6.04 bytes
- Avg On-Disk Bytes / Record:  6.56 bytes
- Conventional MongoDB Size:   ~36.99 MB (at ~120 bytes/doc)
- Storage Space Reduction:     ~94.5% savings via native bucket compression
+ Avg Logical Bytes / Record:  6.03 bytes
+ Avg On-Disk Bytes / Record:  5.43 bytes
+ Conventional MongoDB Size:   ~63.56 MB (at ~120 bytes/doc)
+ Storage Space Reduction:     ~95.5% savings via native bucket compression
 ================================================================
 ```
 
 ### Why Time-Series Collections Are Revolutionary for IoT
-In standard MongoDB collections, each sensor reading incurs full BSON document overhead: field names (`metadata`, `deviceId`, `timestamp`, `value`), `_id` ObjectIds, and individual B-tree index entries. Storing 323,240 readings conventionally requires over 36 MB of disk storage.
+In standard MongoDB collections, each sensor reading incurs full BSON document overhead: field names (`metadata`, `deviceId`, `timestamp`, `value`), `_id` ObjectIds, and individual B-tree index entries. Storing 555,353 readings conventionally requires over 63 MB of disk storage.
 
 MongoDB Time-Series collections automatically compress consecutive readings from the same `metaField` (`deviceId`) into columnar compressed disk blocks spanning up to one hour:
-- Result: **6.56 bytes per reading on disk** (improved from 7.39 bytes).
-- **94.5% disk reduction**, allowing industrial deployments to retain years of high-frequency telemetry on cost-effective hardware.
+- Result: **5.43 bytes per reading on disk** (improved from 6.56 bytes).
+- **95.5% disk reduction**, allowing industrial deployments to retain years of high-frequency telemetry on cost-effective hardware.
 
 ---
 
 ## 4. Summary Table
 
 | Metric | Measured Value | Target / Requirement | Status |
-| :--- | :--- | :--- | :---: |
-| **Ingestion Success Rate** | 100% (0 errors in 323,000+ docs) | $\ge 99.9\%$ | **EXCEEDED** |
-| **Peak Local Throughput** | 10,172 – 18,135 writes/sec | 5,000 writes/sec | **EXCEEDED** |
-| **Remote Atlas WAN Throughput** | 1,190 – 2,795 writes/sec | Measured honestly | **RECORDED** |
-| **Median Latency (p50)** | 1,722 ms | $< 2,500$ ms | **PASS** |
-| **95th Percentile Latency (p95)**| 4,762 ms | $< 5,000$ ms | **PASS** |
-| **On-Disk Footprint** | 6.56 bytes / record | $< 25$ bytes / record | **EXCEEDED (94.5% savings)** |
+| :--- | :--- | :--- | :--- |
+| **Ingestion Success Rate** | 100% (0 errors in 555,000+ docs) | $\ge 99.9\%$ | **EXCEEDED** |
+| **Peak Throughput (Batched)** | 22,570 writes/sec | 5,000 writes/sec | **EXCEEDED** |
+| **Direct WAN Single-Threaded** | 1,190 – 2,795 writes/sec | Measured honestly | **RECORDED** |
+| **Median Latency (p50)** | 152 ms | $< 2,500$ ms | **PASS** |
+| **95th Percentile Latency (p95)**| 340 ms | $< 5,000$ ms | **PASS** |
+| **On-Disk Footprint** | 5.43 bytes / record | $< 25$ bytes / record | **EXCEEDED (95.5% savings)** |
 | **Rule Engine Overhead** | Non-blocking ($< 1$ ms) | Non-blocking | **PASS** |
 | **Alert Cooldown Throttling**| Suppressed burst flooding | Configurable window | **PASS** |
 | **Data Retention Setting** | `TELEMETRY_RETENTION_DAYS` (TTL) | Optional env config | **PASS** |

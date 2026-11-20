@@ -16,10 +16,8 @@ import {
   TrendingUp,
   ArrowDownRight,
   ArrowUpRight,
-  Sliders,
   AlertCircle,
   X,
-  Gauge,
   Clock,
   Layers,
   Bell,
@@ -28,7 +26,6 @@ import {
   Edit3,
   Check,
   Zap,
-  Globe,
   ExternalLink,
 } from 'lucide-react';
 
@@ -65,6 +62,7 @@ export default function Dashboard() {
   const [showGraphsPanel, setShowGraphsPanel] = useState(false);
   const [userGraphs, setUserGraphs] = useState([]);
   const [graphsLoading, setGraphsLoading] = useState(false);
+  const [graphsError, setGraphsError] = useState(null);
   const [editingGraphId, setEditingGraphId] = useState(null);
   const [renamedTitle, setRenamedTitle] = useState('');
 
@@ -134,13 +132,14 @@ export default function Dashboard() {
   // Fetch User Saved Graphs
   const loadUserGraphs = useCallback(async () => {
     setGraphsLoading(true);
+    setGraphsError(null);
     try {
       const res = await fetchUserGraphs();
       if (res && res.data) {
         setUserGraphs(res.data);
       }
     } catch (err) {
-      console.warn('Graphs fetch notice:', err.message);
+      setGraphsError(err.response?.data?.message || err.message || 'Failed to load saved graphs.');
     } finally {
       setGraphsLoading(false);
     }
@@ -222,8 +221,8 @@ export default function Dashboard() {
               healthStatus.status === 'online'
                 ? 'status-online'
                 : healthStatus.status === 'checking'
-                ? 'status-checking'
-                : 'status-offline'
+                  ? 'status-checking'
+                  : 'status-offline'
             }`}
             title={
               healthStatus.error
@@ -265,7 +264,10 @@ export default function Dashboard() {
             <Bell size={15} className={alerts.length > 0 ? 'text-orange pulse-icon' : ''} />
             <span>Alerts</span>
             {alerts.length > 0 && (
-              <span className="telemetry-count-badge" style={{ background: 'rgba(249, 115, 22, 0.25)', color: '#fb923c' }}>
+              <span
+                className="telemetry-count-badge"
+                style={{ background: 'rgba(249, 115, 22, 0.25)', color: '#fb923c' }}
+              >
                 {alerts.length}
               </span>
             )}
@@ -285,7 +287,10 @@ export default function Dashboard() {
             <FolderOpen size={15} className="text-purple" />
             <span>My Graphs</span>
             {userGraphs.length > 0 && (
-              <span className="telemetry-count-badge" style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc' }}>
+              <span
+                className="telemetry-count-badge"
+                style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc' }}
+              >
                 {userGraphs.length}
               </span>
             )}
@@ -316,11 +321,7 @@ export default function Dashboard() {
               </div>
               <span className="user-display-name">{user?.name || 'Engineer'}</span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="logout-btn"
-              title="Log out of session"
-            >
+            <button onClick={handleLogout} className="logout-btn" title="Log out of session">
               <LogOut size={16} />
               <span>Logout</span>
             </button>
@@ -372,12 +373,16 @@ export default function Dashboard() {
                 <Zap size={28} className="text-muted" />
                 <p>No alerts triggered yet.</p>
                 <p className="subtext">
-                  Activate a rule graph and ingest matching telemetry readings (e.g. run <code>npm run mock</code>).
+                  Activate a rule graph and ingest matching telemetry readings (e.g. run{' '}
+                  <code>npm run mock</code>).
                 </p>
               </div>
             ) : (
               alerts.map((al) => (
-                <div key={al._id} className={`alert-item-card ${al.actionType === 'webhook' ? 'webhook' : ''}`}>
+                <div
+                  key={al._id}
+                  className={`alert-item-card ${al.actionType === 'webhook' ? 'webhook' : ''}`}
+                >
                   <div className="alert-card-top">
                     <span className="alert-rule-title">{al.ruleName}</span>
                     <span className={`alert-badge ${al.actionType}`}>
@@ -386,7 +391,9 @@ export default function Dashboard() {
                   </div>
                   <p className="alert-message-text">{al.message}</p>
                   <div className="alert-card-footer">
-                    <span>Target: <code>{al.target || 'N/A'}</code></span>
+                    <span>
+                      Target: <code>{al.target || 'N/A'}</code>
+                    </span>
                     <span>{new Date(al.triggeredAt).toLocaleTimeString()}</span>
                   </div>
                 </div>
@@ -415,6 +422,13 @@ export default function Dashboard() {
           </div>
 
           <div className="drawer-content" style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
+            {graphsError && (
+              <div className="telemetry-error-box">
+                <AlertCircle size={16} />
+                <span>{graphsError}</span>
+              </div>
+            )}
+
             {graphsLoading && userGraphs.length === 0 ? (
               <div className="empty-telemetry">
                 <RefreshCw size={24} className="spin text-purple" />
@@ -424,7 +438,9 @@ export default function Dashboard() {
               <div className="empty-telemetry">
                 <Layers size={28} className="text-muted" />
                 <p>No saved graphs found.</p>
-                <p className="subtext">Construct a pipeline on the canvas and click "Save to Server".</p>
+                <p className="subtext">
+                  Construct a pipeline on the canvas and click "Save to Server".
+                </p>
               </div>
             ) : (
               userGraphs.map((g) => (
@@ -467,8 +483,14 @@ export default function Dashboard() {
                   </div>
 
                   <div className="graph-item-meta">
-                    <span>Updated: {new Date(g.updatedAt).toLocaleDateString()} {new Date(g.updatedAt).toLocaleTimeString()}</span>
-                    <span> • {g.graph?.nodes?.length || 0} nodes, {g.graph?.edges?.length || 0} edges</span>
+                    <span>
+                      Updated: {new Date(g.updatedAt).toLocaleDateString()}{' '}
+                      {new Date(g.updatedAt).toLocaleTimeString()}
+                    </span>
+                    <span>
+                      {' '}
+                      • {g.graph?.nodes?.length || 0} nodes, {g.graph?.edges?.length || 0} edges
+                    </span>
                   </div>
 
                   <div className="graph-actions-row">
@@ -638,7 +660,8 @@ export default function Dashboard() {
                 <Database size={28} className="text-muted" />
                 <p>No telemetry records found for this filter.</p>
                 <p className="subtext">
-                  Run <code>npm run mock</code> in <code>/backend</code> or execute <code>npm run loadtest</code> to stream records into MongoDB!
+                  Run <code>npm run mock</code> in <code>/backend</code> or execute{' '}
+                  <code>npm run loadtest</code> to stream records into MongoDB!
                 </p>
               </div>
             ) : (

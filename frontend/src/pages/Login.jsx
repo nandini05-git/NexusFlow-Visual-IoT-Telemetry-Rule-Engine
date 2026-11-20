@@ -1,16 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import {
-  Radio,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
+import { Radio, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -28,6 +19,14 @@ export default function Login() {
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  useEffect(() => {
+    const redirectMsg = sessionStorage.getItem('auth_redirect_message');
+    if (redirectMsg) {
+      setServerError(redirectMsg);
+      sessionStorage.removeItem('auth_redirect_message');
+    }
+  }, []);
 
   const validate = () => {
     const newErrors = {};
@@ -156,11 +155,7 @@ export default function Login() {
           </div>
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            className="auth-submit-btn"
-            disabled={isSubmitting}
-          >
+          <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 size={18} className="spin" />

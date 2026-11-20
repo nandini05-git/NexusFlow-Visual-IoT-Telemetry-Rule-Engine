@@ -35,7 +35,7 @@ export const compileGraph = (rawGraph, options = {}) => {
   const actionListener = options.actionListener || null;
 
   // 1. Parse and validate DAG structure
-  const { sortedNodes, edges, adjacency, inDegree, nodeMap } = parseGraph(graphData);
+  const { sortedNodes, edges } = parseGraph(graphData);
 
   // 2. Build upstream lookup map (targetId -> array of sourceIds)
   const incomingMap = new Map();
@@ -71,7 +71,8 @@ export const compileGraph = (rawGraph, options = {}) => {
         return stream;
       });
 
-      const combinedStream$ = upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
+      const combinedStream$ =
+        upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
       const mathOps = createMathOperationOperators(node);
       const processedStream$ = combinedStream$.pipe(...mathOps, share());
       nodeObservables.set(node.id, processedStream$);
@@ -90,7 +91,8 @@ export const compileGraph = (rawGraph, options = {}) => {
         return stream;
       });
 
-      const combinedStream$ = upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
+      const combinedStream$ =
+        upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
       const actionOps = createActionTriggerOperators(node, ruleName, actionListener);
       const actionStream$ = combinedStream$.pipe(...actionOps, share());
       nodeObservables.set(node.id, actionStream$);

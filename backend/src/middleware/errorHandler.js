@@ -5,7 +5,8 @@ export const notFoundHandler = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
-  const statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : (err.statusCode || 500);
+  const statusCode =
+    res.statusCode && res.statusCode !== 200 ? res.statusCode : err.statusCode || 500;
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
@@ -20,7 +21,11 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   // Bad JSON input / body-parser syntax error
-  if (err instanceof SyntaxError && (err.status === 400 || err.statusCode === 400) && 'body' in err) {
+  if (
+    err instanceof SyntaxError &&
+    (err.status === 400 || err.statusCode === 400) &&
+    'body' in err
+  ) {
     return res.status(400).json({
       error: 'Invalid JSON payload received',
       details: err.message,

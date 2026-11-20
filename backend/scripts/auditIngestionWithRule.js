@@ -36,9 +36,21 @@ const runAudit = async () => {
       graph: {
         version: '1.0.0',
         nodes: [
-          { id: 'src-1', type: 'dataSource', data: { deviceId: 'turbine-01', sensorType: 'temperature' } },
-          { id: 'math-1', type: 'mathOperation', data: { operation: 'threshold', operator: '>', thresholdValue: 85 } },
-          { id: 'act-1', type: 'actionTrigger', data: { actionType: 'sms_alert', target: '+15550001111', cooldownSeconds: 2 } },
+          {
+            id: 'src-1',
+            type: 'dataSource',
+            data: { deviceId: 'turbine-01', sensorType: 'temperature' },
+          },
+          {
+            id: 'math-1',
+            type: 'mathOperation',
+            data: { operation: 'threshold', operator: '>', thresholdValue: 85 },
+          },
+          {
+            id: 'act-1',
+            type: 'actionTrigger',
+            data: { actionType: 'sms_alert', target: '+15550001111', cooldownSeconds: 2 },
+          },
         ],
         edges: [
           { id: 'e1', source: 'src-1', target: 'math-1' },
@@ -118,7 +130,9 @@ const runAudit = async () => {
     headers: { Authorization: `Bearer ${token}` },
   });
   const alertData = await alertRes.json();
-  console.log(` Alert Events Generated:  ${alertData.count} (Cooldown throttled repeats successfully)`);
+  console.log(
+    ` Alert Events Generated:  ${alertData.count} (Cooldown throttled repeats successfully)`
+  );
 
   // Deactivate graph
   await fetch(`${BASE_URL}/api/graphs/${graphId}/deactivate`, {

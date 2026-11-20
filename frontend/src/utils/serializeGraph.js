@@ -53,7 +53,11 @@ export const validateNodeConfig = (node) => {
     if (!d.operation) {
       issues.push('Operation type is required');
     } else if (d.operation === 'threshold') {
-      if (d.thresholdValue === undefined || d.thresholdValue === null || isNaN(Number(d.thresholdValue))) {
+      if (
+        d.thresholdValue === undefined ||
+        d.thresholdValue === null ||
+        isNaN(Number(d.thresholdValue))
+      ) {
         issues.push('Valid numeric threshold value is required');
       }
       if (!d.operator) {
@@ -192,7 +196,9 @@ export const validateGraph = (nodes = [], edges = []) => {
   });
 
   if (hasCycle) {
-    errors.push('Circular dependency detected! Telemetry rule pipelines must be directed acyclic graphs (DAG).');
+    errors.push(
+      'Circular dependency detected! Telemetry rule pipelines must be directed acyclic graphs (DAG).'
+    );
   }
 
   const serialized = serializeGraph(nodes, edges);

@@ -80,9 +80,7 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         <div className="help-box">
           <Info size={15} className="help-icon" />
-          <p>
-            Connect Data Sources &rarr; Math Operations &rarr; Action Triggers.
-          </p>
+          <p>Connect Data Sources &rarr; Math Operations &rarr; Action Triggers.</p>
         </div>
       </div>
     </aside>

@@ -48,7 +48,9 @@ const runTests = async () => {
   });
   console.log(` -> Status: ${regRes.status}`);
   console.log(` -> Message: ${regRes.data?.message}`);
-  console.log(` -> User: id=${regRes.data?.user?.id}, name=${regRes.data?.user?.name}, password_exposed=${!!regRes.data?.user?.password}`);
+  console.log(
+    ` -> User: id=${regRes.data?.user?.id}, name=${regRes.data?.user?.name}, password_exposed=${!!regRes.data?.user?.password}`
+  );
   console.log(` -> Token received: ${!!regRes.data?.token}`);
   if (regRes.status !== 201 || !regRes.data?.token || regRes.data?.user?.password) {
     throw new Error('Registration test failed');
@@ -108,7 +110,9 @@ const runTests = async () => {
   console.log(` -> Status: ${meNoTokenRes.status} (Expected 401)`);
   console.log(` -> Message: ${meNoTokenRes.data?.message}`);
   if (meNoTokenRes.status !== 401) {
-    throw new Error(`Expected 401 when accessing protected route without token, got ${meNoTokenRes.status}`);
+    throw new Error(
+      `Expected 401 when accessing protected route without token, got ${meNoTokenRes.status}`
+    );
   }
 
   // Test 7: GET /api/auth/me WITH valid token (Should return 200)
@@ -119,7 +123,9 @@ const runTests = async () => {
     },
   });
   console.log(` -> Status: ${meWithTokenRes.status}`);
-  console.log(` -> Current User: ${meWithTokenRes.data?.user?.name} (${meWithTokenRes.data?.user?.email})`);
+  console.log(
+    ` -> Current User: ${meWithTokenRes.data?.user?.name} (${meWithTokenRes.data?.user?.email})`
+  );
   if (meWithTokenRes.status !== 200 || !meWithTokenRes.data?.user?.email) {
     throw new Error('GET /api/auth/me failed with valid token');
   }
@@ -141,7 +147,9 @@ const runTests = async () => {
     },
   });
   console.log(` -> Status: ${telWithTokenRes.status}`);
-  console.log(` -> Telemetry Records returned: ${telWithTokenRes.data?.count ?? telWithTokenRes.data?.data?.length}`);
+  console.log(
+    ` -> Telemetry Records returned: ${telWithTokenRes.data?.count ?? telWithTokenRes.data?.data?.length}`
+  );
   if (telWithTokenRes.status !== 200) {
     throw new Error('GET /api/telemetry failed with valid token');
   }

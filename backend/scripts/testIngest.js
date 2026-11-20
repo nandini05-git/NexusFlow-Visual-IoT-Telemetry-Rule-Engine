@@ -47,7 +47,10 @@ const runIngestTests = async () => {
 
   // 1. Health Check
   const health = await call('/api/health');
-  testCase('GET /api/health responds with status ok', health.status === 200 && health.data.status === 'ok');
+  testCase(
+    'GET /api/health responds with status ok',
+    health.status === 200 && health.data.status === 'ok'
+  );
 
   // 2. Single Ingest: Valid Reading
   const validSingle = await call('/api/ingest', {
@@ -59,7 +62,10 @@ const runIngestTests = async () => {
       unit: '°C',
     }),
   });
-  testCase('POST /api/ingest accepts valid reading (201)', validSingle.status === 201 && validSingle.data.success === true);
+  testCase(
+    'POST /api/ingest accepts valid reading (201)',
+    validSingle.status === 201 && validSingle.data.success === true
+  );
 
   // 3. Single Ingest: Missing deviceId
   const missingDevice = await call('/api/ingest', {
@@ -114,7 +120,10 @@ const runIngestTests = async () => {
     method: 'POST',
     body: JSON.stringify(oversizedArray),
   });
-  testCase('POST /api/ingest/batch rejects batches exceeding 10,000 readings (400)', overCap.status === 400);
+  testCase(
+    'POST /api/ingest/batch rejects batches exceeding 10,000 readings (400)',
+    overCap.status === 400
+  );
 
   // 8. Auth Protection on /api/telemetry
   const unauthTel = await call('/api/telemetry');
@@ -122,7 +131,10 @@ const runIngestTests = async () => {
 
   // 9. Auth Protection on /api/telemetry/stats
   const unauthStats = await call('/api/telemetry/stats');
-  testCase('GET /api/telemetry/stats requires authentication token (401)', unauthStats.status === 401);
+  testCase(
+    'GET /api/telemetry/stats requires authentication token (401)',
+    unauthStats.status === 401
+  );
 
   // 10. Authenticate to obtain token
   const authUser = await call('/api/auth/register', {

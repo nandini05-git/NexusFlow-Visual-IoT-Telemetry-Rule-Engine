@@ -25,20 +25,23 @@ test('NexusFlow Backend Hardening & Reliability Test Suite', async (t) => {
     server.close();
   });
 
-  await t.test('1. Malformed JSON returns HTTP 400 with consistent { error, details } format', async () => {
-    const res = await fetch(`${baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{"invalidJson": unquoted_value}',
-    });
+  await t.test(
+    '1. Malformed JSON returns HTTP 400 with consistent { error, details } format',
+    async () => {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"invalidJson": unquoted_value}',
+      });
 
-    assert.equal(res.status, 400, 'Expected HTTP 400 for malformed JSON');
-    const body = await res.json();
-    assert.ok(body.error, 'Response must contain "error" field');
-    assert.ok(body.details !== undefined, 'Response must contain "details" field');
-    assert.equal(body.error, 'Invalid JSON payload received');
-    assert.equal(body.success, false);
-  });
+      assert.equal(res.status, 400, 'Expected HTTP 400 for malformed JSON');
+      const body = await res.json();
+      assert.ok(body.error, 'Response must contain "error" field');
+      assert.ok(body.details !== undefined, 'Response must contain "details" field');
+      assert.equal(body.error, 'Invalid JSON payload received');
+      assert.equal(body.success, false);
+    }
+  );
 
   await t.test('2. Rate limiting on login triggers HTTP 429 when threshold exceeded', async () => {
     // Create an isolated sub-app with strict limit of 3 requests to test rate limiting precisely
@@ -79,46 +82,57 @@ test('NexusFlow Backend Hardening & Reliability Test Suite', async (t) => {
     subServer.close();
   });
 
-  await t.test('3. Graceful stopAll terminates all active rule subscriptions and clears in-memory state', async () => {
-    let stoppedCount = 0;
-    const mockController1 = {
-      stop: () => { stoppedCount++; },
-      metadata: { nodeCount: 3 },
-    };
-    const mockController2 = {
-      stop: () => { stoppedCount++; },
-      metadata: { nodeCount: 4 },
-    };
+  await t.test(
+    '3. Graceful stopAll terminates all active rule subscriptions and clears in-memory state',
+    async () => {
+      let stoppedCount = 0;
+      const mockController1 = {
+        stop: () => {
+          stoppedCount++;
+        },
+        metadata: { nodeCount: 3 },
+      };
+      const mockController2 = {
+        stop: () => {
+          stoppedCount++;
+        },
+        metadata: { nodeCount: 4 },
+      };
 
-    ruleRunner.activeGraphs.set('mock-graph-1', {
-      compiled: mockController1,
-      ownerId: 'user-1',
-      graphName: 'Test Graph 1',
-      activatedAt: new Date(),
-    });
+      ruleRunner.activeGraphs.set('mock-graph-1', {
+        compiled: mockController1,
+        ownerId: 'user-1',
+        graphName: 'Test Graph 1',
+        activatedAt: new Date(),
+      });
 
-    ruleRunner.activeGraphs.set('mock-graph-2', {
-      compiled: mockController2,
-      ownerId: 'user-1',
-      graphName: 'Test Graph 2',
-      activatedAt: new Date(),
-    });
+      ruleRunner.activeGraphs.set('mock-graph-2', {
+        compiled: mockController2,
+        ownerId: 'user-1',
+        graphName: 'Test Graph 2',
+        activatedAt: new Date(),
+      });
 
-    ruleRunner.lastTriggeredTimes.set('mock-graph-1:node-1', Date.now());
-    ruleRunner.lastTriggeredTimes.set('mock-graph-2:node-2', Date.now());
+      ruleRunner.lastTriggeredTimes.set('mock-graph-1:node-1', Date.now());
+      ruleRunner.lastTriggeredTimes.set('mock-graph-2:node-2', Date.now());
 
-    assert.equal(ruleRunner.listActive().length, 2, 'Should have 2 active graphs');
-    assert.equal(ruleRunner.isActive('mock-graph-1'), true);
+      assert.equal(ruleRunner.listActive().length, 2, 'Should have 2 active graphs');
+      assert.equal(ruleRunner.isActive('mock-graph-1'), true);
 
-    // Invoke stopAll
-    ruleRunner.stopAll();
+      // Invoke stopAll
+      ruleRunner.stopAll();
 
-    assert.equal(ruleRunner.listActive().length, 0, 'Active graphs map should be empty after stopAll');
-    assert.equal(ruleRunner.isActive('mock-graph-1'), false);
-    assert.equal(ruleRunner.isActive('mock-graph-2'), false);
-    assert.equal(ruleRunner.lastTriggeredTimes.size, 0, 'Cooldown map should be cleared');
-    assert.equal(stoppedCount, 2, 'Both controller stop() methods must have been called');
-  });
+      assert.equal(
+        ruleRunner.listActive().length,
+        0,
+        'Active graphs map should be empty after stopAll'
+      );
+      assert.equal(ruleRunner.isActive('mock-graph-1'), false);
+      assert.equal(ruleRunner.isActive('mock-graph-2'), false);
+      assert.equal(ruleRunner.lastTriggeredTimes.size, 0, 'Cooldown map should be cleared');
+      assert.equal(stoppedCount, 2, 'Both controller stop() methods must have been called');
+    }
+  );
 
   await t.test('4. Request ID is attached to response headers and request context', async () => {
     const res = await fetch(`${baseUrl}/api/health`);

@@ -17,8 +17,8 @@ const normalizeReading = (body) => {
     typeof rawValue === 'number'
       ? rawValue
       : rawValue !== null && rawValue !== undefined && !isNaN(Number(rawValue))
-      ? Number(rawValue)
-      : undefined;
+        ? Number(rawValue)
+        : undefined;
 
   if (!deviceId || !sensorType || numericValue === undefined) {
     return null;
@@ -212,10 +212,7 @@ export const getTelemetry = async (req, res, next) => {
       }
     }
 
-    const readings = await Telemetry.find(query)
-      .sort({ timestamp: -1 })
-      .limit(parsedLimit)
-      .lean();
+    const readings = await Telemetry.find(query).sort({ timestamp: -1 }).limit(parsedLimit).lean();
 
     return res.status(200).json({
       success: true,

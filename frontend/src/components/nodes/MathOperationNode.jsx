@@ -1,6 +1,6 @@
 import React from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import { Cpu, Activity, Calculator, Filter, Sigma, TrendingDown, TrendingUp } from 'lucide-react';
+import { Cpu, Calculator, Filter, Sigma, TrendingDown, TrendingUp } from 'lucide-react';
 
 export default function MathOperationNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
@@ -54,11 +54,7 @@ export default function MathOperationNode({ id, data, isConnectable }) {
       </div>
 
       <div className="flow-node-body">
-        {hasError && (
-          <div className="node-error-callout">
-            {errorMessage}
-          </div>
-        )}
+        {hasError && <div className="node-error-callout">{errorMessage}</div>}
         <div className="node-config-field">
           <label>Operation Type</label>
           <select value={operation} onChange={handleOpChange} className="node-select">
@@ -127,7 +123,9 @@ export default function MathOperationNode({ id, data, isConnectable }) {
           {operation === 'threshold' && (
             <>
               <Filter size={12} className="text-purple" />
-              <span>Pass when value {operator} {thresholdValue}</span>
+              <span>
+                Pass when value {operator} {thresholdValue}
+              </span>
             </>
           )}
           {operation === 'moving_average' && (

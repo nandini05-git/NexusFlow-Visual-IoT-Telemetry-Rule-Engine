@@ -18,9 +18,7 @@ const router = express.Router();
 // All graph routes require user authentication
 router.use(requireAuth);
 
-router.route('/')
-  .post(createGraph)
-  .get(getGraphs);
+router.route('/').post(createGraph).get(getGraphs);
 
 // Active running graphs for authenticated user (placed before /:id)
 router.get('/active', getActiveGraphs);
@@ -28,10 +26,7 @@ router.get('/active', getActiveGraphs);
 // Ad-hoc compile endpoint for validating current unsaved canvas graph
 router.post('/compile', compileAdHocGraph);
 
-router.route('/:id')
-  .get(getGraphById)
-  .put(updateGraph)
-  .delete(deleteGraph);
+router.route('/:id').get(getGraphById).put(updateGraph).delete(deleteGraph);
 
 // Dry-run compile endpoint for saved graph
 router.post('/:id/compile', compileSavedGraph);

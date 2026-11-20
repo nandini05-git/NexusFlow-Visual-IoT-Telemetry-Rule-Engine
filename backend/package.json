@@ -15,6 +15,9 @@
     "test:runner": "node --test tests/ruleRunner.test.js",
     "test:hardening": "node --test tests/hardening.test.js",
     "test:graph": "node scripts/testWeek2Compiler.js",
+    "smoke": "node scripts/e2eSmoke.js",
+    "lint": "eslint src/ tests/ scripts/",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\"",
     "loadtest": "node scripts/loadTest.js",
     "storage:stats": "node scripts/storageStats.js"
   },
@@ -32,6 +35,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "eslint": "^10.15.0",
+    "nodemon": "^3.1.9",
+    "prettier": "^3.10.1"
   }
 }

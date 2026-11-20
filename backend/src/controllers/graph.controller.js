@@ -1,5 +1,5 @@
 import RuleGraph from '../models/RuleGraph.js';
-import { parseGraph, GraphValidationError } from '../compiler/graphParser.js';
+import { parseGraph } from '../compiler/graphParser.js';
 import { compileGraph } from '../compiler/compileGraph.js';
 import ruleRunner from '../compiler/ruleRunner.js';
 

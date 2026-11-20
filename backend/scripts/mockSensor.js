@@ -35,7 +35,9 @@ const sendReading = async () => {
 
     if (response.ok) {
       const data = await response.json();
-      console.log(`[${new Date().toLocaleTimeString()}] Sent ${DEVICE_ID} ${SENSOR_TYPE}: ${currentTemp} ${UNIT} -> Success (id: ${data.data?._id || 'ok'})`);
+      console.log(
+        `[${new Date().toLocaleTimeString()}] Sent ${DEVICE_ID} ${SENSOR_TYPE}: ${currentTemp} ${UNIT} -> Success (id: ${data.data?._id || 'ok'})`
+      );
     } else {
       const errText = await response.text();
       console.warn(`[${new Date().toLocaleTimeString()}] HTTP ${response.status}: ${errText}`);

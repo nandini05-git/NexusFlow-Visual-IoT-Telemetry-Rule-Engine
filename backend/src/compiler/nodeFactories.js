@@ -12,7 +12,8 @@ import { filter, map, scan, tap } from 'rxjs';
  * or nested (metadata) telemetry readings.
  */
 export const extractTelemetryFields = (reading) => {
-  if (!reading || typeof reading !== 'object') return { deviceId: null, sensorType: null, value: NaN };
+  if (!reading || typeof reading !== 'object')
+    return { deviceId: null, sensorType: null, value: NaN };
   const metadata = reading.metadata || {};
   const deviceId = reading.deviceId || metadata.deviceId || null;
   const sensorType = reading.sensorType || metadata.sensorType || null;
@@ -125,7 +126,9 @@ export const createMathOperationOperators = (node) => {
         scan(
           (acc, reading) => {
             const { value } = extractTelemetryFields(reading);
-            const window = windowSize ? [...acc.window, value].slice(-windowSize) : [...acc.window, value];
+            const window = windowSize
+              ? [...acc.window, value].slice(-windowSize)
+              : [...acc.window, value];
             const sum = Number(window.reduce((a, b) => a + b, 0).toFixed(2));
 
             return {
@@ -152,7 +155,9 @@ export const createMathOperationOperators = (node) => {
         scan(
           (acc, reading) => {
             const { value } = extractTelemetryFields(reading);
-            const window = windowSize ? [...acc.window, value].slice(-windowSize) : [...acc.window, value];
+            const window = windowSize
+              ? [...acc.window, value].slice(-windowSize)
+              : [...acc.window, value];
             const minVal = Math.min(...window);
 
             return {
@@ -178,7 +183,9 @@ export const createMathOperationOperators = (node) => {
         scan(
           (acc, reading) => {
             const { value } = extractTelemetryFields(reading);
-            const window = windowSize ? [...acc.window, value].slice(-windowSize) : [...acc.window, value];
+            const window = windowSize
+              ? [...acc.window, value].slice(-windowSize)
+              : [...acc.window, value];
             const maxVal = Math.max(...window);
 
             return {
@@ -198,9 +205,7 @@ export const createMathOperationOperators = (node) => {
     }
 
     default:
-      return [
-        map((reading) => reading),
-      ];
+      return [map((reading) => reading)];
   }
 };
 
@@ -214,7 +219,11 @@ export const createMathOperationOperators = (node) => {
  * @param {Function} [actionListener] - Optional callback invoked on trigger
  * @returns {Array<Function>} List of RxJS operators to pipe
  */
-export const createActionTriggerOperators = (node, ruleName = 'Rule Graph', actionListener = null) => {
+export const createActionTriggerOperators = (
+  node,
+  ruleName = 'Rule Graph',
+  actionListener = null
+) => {
   const data = node.data || {};
   const actionType = data.actionType || 'sms_alert';
   const target = data.target || 'N/A';
@@ -223,8 +232,10 @@ export const createActionTriggerOperators = (node, ruleName = 'Rule Graph', acti
     tap((reading) => {
       const { deviceId, sensorType, value } = extractTelemetryFields(reading);
       const logMessage = `[ACTION TRIGGERED] Rule: "${ruleName}" | Action: ${actionType.toUpperCase()} | Target: ${target} | Device: ${deviceId} | ${sensorType}: ${value}`;
-      
-      console.log(`\n======================================================\n${logMessage}\n======================================================`);
+
+      console.log(
+        `\n======================================================\n${logMessage}\n======================================================`
+      );
 
       if (typeof actionListener === 'function') {
         actionListener({

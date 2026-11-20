@@ -22,6 +22,28 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Axios interceptor to handle expired or invalid 401 tokens
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const url = error.config?.url || '';
+      // Exclude initial login and registration attempts from auto-redirection
+      if (!url.includes('/api/auth/login') && !url.includes('/api/auth/register')) {
+        localStorage.removeItem('nexusflow_token');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          sessionStorage.setItem(
+            'auth_redirect_message',
+            'Your session has expired. Please sign in again.'
+          );
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API Calls
 export const registerUser = async (userData) => {
   const response = await client.post('/api/auth/register', userData);
@@ -44,7 +66,13 @@ export const checkHealth = async () => {
   return response.data;
 };
 
-export const getTelemetry = async (deviceId = '', limit = 100, sensorType = '', from = '', to = '') => {
+export const getTelemetry = async (
+  deviceId = '',
+  limit = 100,
+  sensorType = '',
+  from = '',
+  to = ''
+) => {
   const params = {};
   if (deviceId) params.deviceId = deviceId;
   if (limit) params.limit = limit;
