@@ -470,6 +470,16 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
                                                |
                                                v
 +-----------------------------------------------------------------------------------------------+
+|  BETWEEN WEEK 2 & WEEK 3: REVIEW STABILIZATION & PLANNING [COMPLETED]                         |
+|  - Mid-Project Review release marker tag: week2-mid-review                                    |
+|  - Build sanity check: 100% pass across all unit, integration, and E2E smoke tests           |
+|  - Review Feedback log template: docs/mid-review-feedback.md                                  |
+|  - Technical debt and feature sizing backlog: docs/backlog.md                                 |
+|  - Architectural specification and design roadmap for Week 3: docs/week3-plan.md              |
++-----------------------------------------------------------------------------------------------+
+                                               |
+                                               v
++-----------------------------------------------------------------------------------------------+
 |  WEEK 3: REAL-TIME STREAMING & LIVE CANVAS PREVIEWS [UPCOMING]                                |
 |  - WebSocket Telemetry Broadcasting: stream live sensor data into active browser sessions     |
 |  - Pulsing wire animations on React Flow edges when telemetry packets pass through            |
@@ -484,6 +494,13 @@ We executed automated stress tests against our live MongoDB Atlas cloud replica 
 |  - Industrial actuator command dispatch and production deployment containerization            |
 +-----------------------------------------------------------------------------------------------+
 ```
+
+> [!NOTE]
+> **Between Week 2 and Week 3 Review Transition**:  
+> Following the Mid-Project Review release (tag `week2-mid-review`), review documentation and planning assets have been established:
+> - Review Feedback Tracker: [**`docs/mid-review-feedback.md`**](file:///c:/NexusFlow/docs/mid-review-feedback.md)
+> - Technical Backlog & Feature Sizing: [**`docs/backlog.md`**](file:///c:/NexusFlow/docs/backlog.md)
+> - Week 3 Architectural Plan & Protocol Specification: [**`docs/week3-plan.md`**](file:///c:/NexusFlow/docs/week3-plan.md)
 
 ---
 

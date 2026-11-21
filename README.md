@@ -416,7 +416,8 @@ node scripts/seedDemo.js
 | Milestone | Deliverables | Status |
 | :--- | :--- | :---: |
 | **Week 1** | Native MongoDB Time-Series ingestion, REST APIs, React Flow canvas scaffolding, JWT auth, load test | **DONE** |
-| **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (MID-REVIEW READY)** |
+| **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (TAG: `week2-mid-review`)** |
+| **Transition** | **Between Week 2 & 3**: Build sanity check, [Feedback Log](file:///c:/NexusFlow/docs/mid-review-feedback.md), [Technical Backlog](file:///c:/NexusFlow/docs/backlog.md), and [Week 3 Architecture Plan](file:///c:/NexusFlow/docs/week3-plan.md) | **COMPLETE** |
 | **Week 3** | WebSocket live telemetry streaming, pulsing wire animations, real-time node badges, live Recharts dashboards | **PLANNED** |
 | **Week 4** | Production alert dispatchers (real Twilio SMS & Webhooks), actuator controls, Docker containerization | **PLANNED** |
 
