@@ -95,10 +95,16 @@ NexusFlow/
 ├── .gitignore                      # Git ignore rules for Node, Vite, logs & env
 ├── README.md                       # Comprehensive documentation & roadmap
 ├── docs/                           # Project documentation & audit reports
-│   ├── PROJECT_EXPLAINED.md        # Beginner guide, architecture, data flow & 15 review Q&As
+│   ├── SUBMISSION_WEEK1-2.md       # Official Weeks 1 & 2 milestone submission package
+│   ├── PROJECT_EXPLAINED.md        # Beginner guide, architecture, data flow & 20 review Q&As
 │   ├── graph.schema.json           # JSON Schema (Draft-07) for React Flow DAG serialization
 │   ├── graph-serialization-proof.md# Topology & serialization verification report
-│   ├── ingestion-audit.md          # WAN Atlas vs active rule evaluation benchmark audit
+│   ├── ingestion-audit.md          # Ingestion velocity & Time-Series storage compression audit
+│   ├── mid-project-review-checklist.md # 10-point deliverables verification & defense guide
+│   ├── screenshots-checklist.md    # 12-item presentation screenshot checklist
+│   ├── mid-review-feedback.md      # Review feedback log & action items
+│   ├── backlog.md                  # Prioritized post-review technical backlog
+│   ├── week3-plan.md               # Week 3 WebSocket & live canvas architecture plan
 │   ├── week1-ingestion-report.md   # Benchmarks (10k+ writes/sec, 7 bytes/doc audit)
 │   └── week1-summary.md            # Week 1 summary, screenshot checklist & transition
 ├── backend/                        # Node.js + Express backend service
@@ -384,8 +390,8 @@ node scripts/seedDemo.js
   - Compound index streamlining: removed redundant single-field indexes, cutting index write amplification in half.
   - Lean batch insert path with `ordered: false` and `lean: true`.
   - Added warmup phase and `p50`/`p95` latency calculation to `loadTest.js`.
-  - Storage stats: **555,353 documents** stored in **5.43 bytes/doc** (**95.5% storage space reduction**).
-  - Peak concurrent load test throughput: **22,570 writes/sec** (`p50: 152 ms`, `p95: 340 ms`).
+  - Storage stats: **913,874 documents** stored in **5.19 bytes/doc on disk** (**95.7% storage space reduction**).
+  - High-throughput concurrent load test throughput: **18,638 writes/sec** (peak **22,570 writes/sec**, 0 failures).
   - Optional data retention setting: `TELEMETRY_RETENTION_DAYS` (TTL).
 - [x] **Backend Hardening & Security**:
   - Helmet security headers, rate limiting (`authLimiter`, `apiLimiter`, `ingestLimiter`), 10MB payload size limits.
@@ -408,6 +414,7 @@ node scripts/seedDemo.js
   - Axios 401 session expiration interceptor with automatic redirect and user feedback.
   - Presentation screenshots checklist (`docs/screenshots-checklist.md`).
   - Release tag marker: `week2-mid-review`.
+  - Official Weeks 1 & 2 Submission Package: [**`docs/SUBMISSION_WEEK1-2.md`**](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md).
 
 ---
 
@@ -416,7 +423,7 @@ node scripts/seedDemo.js
 | Milestone | Deliverables | Status |
 | :--- | :--- | :---: |
 | **Week 1** | Native MongoDB Time-Series ingestion, REST APIs, React Flow canvas scaffolding, JWT auth, load test | **DONE** |
-| **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (TAG: `week2-mid-review`)** |
+| **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (SUBMITTED: [Package](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md), TAG: `week2-mid-review`)** |
 | **Transition** | **Between Week 2 & 3**: Build sanity check, [Feedback Log](file:///c:/NexusFlow/docs/mid-review-feedback.md), [Technical Backlog](file:///c:/NexusFlow/docs/backlog.md), and [Week 3 Architecture Plan](file:///c:/NexusFlow/docs/week3-plan.md) | **COMPLETE** |
 | **Week 3** | WebSocket live telemetry streaming, pulsing wire animations, real-time node badges, live Recharts dashboards | **PLANNED** |
 | **Week 4** | Production alert dispatchers (real Twilio SMS & Webhooks), actuator controls, Docker containerization | **PLANNED** |

@@ -1,6 +1,8 @@
 # NexusFlow: Mid-Project Review Screenshots Checklist
 
-> **Purpose**: A checklist of visual proof and system screenshots to capture and include in the Mid-Project Review evaluation presentation.
+> **Purpose**: A checklist of visual proof and system screenshots to capture and include in the Mid-Project Review evaluation presentation.  
+> **Official Submission Package**: [`docs/SUBMISSION_WEEK1-2.md`](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md)  
+> **Evaluation Date**: 22 November 2026  
 
 ---
 
@@ -18,8 +20,8 @@
 | **08** | **Active Rule Status** | Canvas Top Toolbar | Click **Activate**: toolbar badge transitioning from slate `DRAFT` to pulsing green `ACTIVE`, demonstrating live subscription to the backend `telemetryBus`. | [ ] |
 | **09** | **Triggered Alerts Panel** | Dashboard Right Drawer | Click **Triggered Alerts**: drawer displaying live `AlertEvent` cards with timestamps, target recipients (`+1 (555) 019-2834`), breach values, and cooldown indicators. | [ ] |
 | **10** | **Serialized Graph JSON** | JSON Modal / Raw Export | Click **JSON** in toolbar: previewing formal Draft-07 JSON Schema export with node coordinates, version `1.0.0`, and typed operational parameters. | [ ] |
-| **11** | **High-Throughput Load Test** | Terminal Execution | Terminal output of `node scripts/loadTest.js` demonstrating **22,570 writes/sec**, 0 failures across 228,000 documents, and `p50`/`p95` percentile latencies. | [ ] |
-| **12** | **Time-Series Storage Audit** | Terminal Execution | Terminal output of `npm run storage:stats` showing **555,000+ documents**, **5.43 bytes/record on disk**, and **~95.5% storage reduction** on MongoDB Atlas. | [ ] |
+| **11** | **High-Throughput Load Test** | Terminal Execution | Terminal output of `node scripts/loadTest.js` demonstrating **18,638 writes/sec** (peak **22,570 writes/sec**), 0 failures across 191,000 documents, and `p50` (167ms)/`p95` (464ms) percentile latencies. | [ ] |
+| **12** | **Time-Series Storage Audit** | Terminal Execution | Terminal output of `npm run storage:stats` showing **913,874 records**, **5.19 bytes/record on disk**, and **~95.7% storage reduction** on MongoDB Atlas. | [ ] |
 
 ---
 
