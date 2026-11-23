@@ -4,8 +4,10 @@
 > **Milestone**: Mid-Project Evaluation (End of Week 2)  
 > **Author**: Nandini V  
 > **Repository Branch**: `nandini`  
-> **Evaluation Date**: 22 November 2026  
+> **Evaluation Date**: 23 November 2026 (Final Submission Freeze)  
+> **Final Submission Commit Hash**: `[COMMIT_HASH_PLACEHOLDER]` <!-- Placeholder to be filled after git push -->  
 > **Official Submission Document**: [`docs/SUBMISSION_WEEK1-2.md`](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md)  
+> **Pull Request Description**: [`docs/PR_DESCRIPTION.md`](file:///c:/NexusFlow/docs/PR_DESCRIPTION.md)  
 
 ---
 
@@ -39,6 +41,8 @@
    - [**`scripts/demo.md`**](file:///c:/NexusFlow/scripts/demo.md): 8-minute step-by-step walkthrough covering auth, canvas usability, live problems, compile check, rule activation, mock sensor, alert drawer, load test, and storage stats.
 5. **Comprehensive Engineering Manual**:
    - [**`docs/PROJECT_EXPLAINED.md`**](file:///c:/NexusFlow/docs/PROJECT_EXPLAINED.md): 300+ line guide with beginner factory analogies, step-by-step data journeys, architecture sequence diagrams, and 20 presentation review Q&As.
+6. **Pull Request Description**:
+   - [**`docs/PR_DESCRIPTION.md`**](file:///c:/NexusFlow/docs/PR_DESCRIPTION.md): Comprehensive ready-to-paste Pull Request description for review into main.
 
 ---
 

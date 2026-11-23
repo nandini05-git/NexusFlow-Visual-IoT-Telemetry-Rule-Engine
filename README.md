@@ -96,6 +96,7 @@ NexusFlow/
 ├── README.md                       # Comprehensive documentation & roadmap
 ├── docs/                           # Project documentation & audit reports
 │   ├── SUBMISSION_WEEK1-2.md       # Official Weeks 1 & 2 milestone submission package
+│   ├── PR_DESCRIPTION.md           # Comprehensive ready-to-paste Pull Request description
 │   ├── PROJECT_EXPLAINED.md        # Beginner guide, architecture, data flow & 20 review Q&As
 │   ├── graph.schema.json           # JSON Schema (Draft-07) for React Flow DAG serialization
 │   ├── graph-serialization-proof.md# Topology & serialization verification report
@@ -219,19 +220,43 @@ VITE_API_URL=http://localhost:5000
 
 ## 🚀 Setup & Execution Guide (2 Terminals)
 
-### Terminal 1 — Start Backend Server
+### 1. Initial Setup & Dependencies
+```powershell
+# In backend:
+cd backend
+copy .env.example .env
+# Set MONGO_URI in backend/.env to your MongoDB Atlas connection string or local MongoDB instance
+npm install
+node scripts/seedDemo.js
+
+# In frontend:
+cd ../frontend
+copy .env.example .env
+npm install
+```
+
+### 2. Start Services
+**Terminal 1 — Start Backend Server**:
 ```powershell
 cd backend
 npm run dev
 ```
 *(Runs on `http://localhost:5000`)*
 
-### Terminal 2 — Start Frontend Application
+**Terminal 2 — Start Frontend Application**:
 ```powershell
 cd frontend
 npm run dev
 ```
 *(Runs on `http://localhost:3000`)*
+
+### 3. Quick Verification Suite
+```powershell
+cd backend; npm test       # 41 backend tests (100% pass)
+cd backend; npm run smoke  # 11-step E2E smoke test (100% pass)
+cd frontend; npm test      # 7 Vitest serialization tests (100% pass)
+cd frontend; npm run build # Production asset bundle check
+```
 
 ---
 

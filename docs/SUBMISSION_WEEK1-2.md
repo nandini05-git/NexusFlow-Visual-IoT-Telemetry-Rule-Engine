@@ -5,8 +5,10 @@
 > **Evaluation Organization**: Infotact Solutions  
 > **Author / Intern**: Nandini V  
 > **Repository Branch**: `nandini`  
-> **Submission Date**: 22 November 2026  
+> **Submission Date**: 23 November 2026  
 > **Official Deadline**: 23 November 2026  
+> **Final Submission Commit Hash**: `[COMMIT_HASH_PLACEHOLDER]` <!-- Placeholder to be filled after git push -->  
+> **Pull Request Description**: [`docs/PR_DESCRIPTION.md`](file:///c:/NexusFlow/docs/PR_DESCRIPTION.md)  
 
 ---
 
@@ -95,37 +97,41 @@ flowchart TD
 
 ## 4. How to Run & Verify
 
-### A. Environment Configuration
-Ensure `backend/.env` exists with valid configuration:
-```ini
-PORT=5000
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/nexusflow?retryWrites=true&w=majority
-JWT_SECRET=supersecretjwtkey_nexusflow_2026_production
-TELEMETRY_RETENTION_DAYS=0
+### A. Environment Configuration & Installation
+1. **Backend Configuration & Dependencies**:
+   ```powershell
+   cd backend
+   copy .env.example .env
+   # Edit backend/.env to set MONGO_URI to your MongoDB Atlas connection string or local MongoDB instance
+   npm install
+   ```
+2. **Frontend Configuration & Dependencies**:
+   ```powershell
+   cd ../frontend
+   copy .env.example .env
+   npm install
+   ```
+
+### B. Seed Demo Data & Industrial Templates
+To populate the database with a pre-configured demo account and 3 production-ready visual rule graphs:
+```powershell
+cd ../backend
+node scripts/seedDemo.js
 ```
 
-### B. Two-Terminal Startup (Development Mode)
+### C. Two-Terminal Startup (Development Mode)
 **Terminal 1 — Backend API Server (Port 5000)**:
 ```powershell
-cd c:\NexusFlow\backend
+cd backend
 npm run dev
 ```
 
 **Terminal 2 — Frontend Application (Port 3000)**:
 ```powershell
-cd c:\NexusFlow\frontend
+cd frontend
 npm run dev
 ```
 Open your browser at [**`http://localhost:3000`**](http://localhost:3000).
-
----
-
-### C. Seed Demo Data & Industrial Templates
-To populate the database with a pre-configured demo account and 3 production-ready visual rule graphs:
-```powershell
-cd c:\NexusFlow\backend
-node scripts/seedDemo.js
-```
 
 ---
 
@@ -167,6 +173,7 @@ All required evaluation reports, schema files, and defense guides are checked in
 - [**`scripts/demo.md`**](file:///c:/NexusFlow/scripts/demo.md): Scripted 8-minute demonstration walkthrough for the evaluation panel.
 - [**`docs/screenshots-checklist.md`**](file:///c:/NexusFlow/docs/screenshots-checklist.md): 12-item screenshot checklist for slide deck preparation.
 - [**`docs/PROJECT_EXPLAINED.md`**](file:///c:/NexusFlow/docs/PROJECT_EXPLAINED.md): 300+ line onboarding guide with factory manager analogies and architecture deep dives.
+- [**`docs/PR_DESCRIPTION.md`**](file:///c:/NexusFlow/docs/PR_DESCRIPTION.md): Comprehensive ready-to-paste Pull Request description for review into main.
 
 ---
 

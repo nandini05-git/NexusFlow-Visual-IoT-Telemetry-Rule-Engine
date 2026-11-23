@@ -66,7 +66,8 @@ export const verifyTimeSeriesCollection = async (connection) => {
 };
 
 export const connectDB = async () => {
-  const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
+  const mongoURI =
+    process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
 
   try {
     const conn = await mongoose.connect(mongoURI, {

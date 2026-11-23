@@ -13,7 +13,8 @@ import Telemetry from '../src/models/Telemetry.js';
 
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
+const MONGO_URI =
+  process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/nexusflow';
 
 const runStorageStats = async () => {
   console.log('================================================================');
