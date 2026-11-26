@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { Zap, Webhook, MessageSquare } from 'lucide-react';
+import { graphActivityStore } from '../../utils/graphActivityStore';
 
 export default function ActionTriggerNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
+  const [activity, setActivity] = useState(() => graphActivityStore.getNodeState(id));
+
+  useEffect(() => {
+    return graphActivityStore.subscribeNode(id, (state) => {
+      setActivity(state);
+    });
+  }, [id]);
 
   const actionType = data.actionType || 'sms_alert';
   const target =
@@ -33,10 +41,12 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
 
   const hasError = !!data.hasError;
   const errorMessage = data.errorMessage;
+  const isRuleFired = activity.ruleFired;
+  const isHot = activity.isHot;
 
   return (
     <div
-      className={`flow-node flow-node-action ${hasError ? 'flow-node-error' : ''}`}
+      className={`flow-node flow-node-action ${hasError ? 'flow-node-error' : ''} ${isRuleFired ? 'node-rule-fired' : isHot ? 'node-hot-active' : ''}`}
       title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
     >
       {/* Input handle only (left) */}
@@ -49,13 +59,17 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
       />
 
       <div className="flow-node-header">
-        <Zap size={16} className="text-orange" />
+        <Zap size={16} className={isRuleFired ? 'text-rose-400' : 'text-orange'} />
         <span className="flow-node-title">{data.label || 'Action Trigger'}</span>
-        {hasError && (
+        {hasError ? (
           <span className="flow-node-error-badge" title={errorMessage}>
             ⚠️ Config Error
           </span>
-        )}
+        ) : isRuleFired ? (
+          <span className="node-fired-pill animate-pulse" title="Rule trigger fired outbound action!">
+            ⚡ FIRED!
+          </span>
+        ) : null}
       </div>
 
       <div className="flow-node-body">
@@ -116,13 +130,13 @@ export default function ActionTriggerNode({ id, data, isConnectable }) {
           </>
         )}
 
-        <div className="node-status-bar">
+        <div className={`node-status-bar ${isRuleFired ? 'status-fired' : ''}`}>
           {actionType === 'sms_alert' ? (
-            <MessageSquare size={12} className="text-orange" />
+            <MessageSquare size={12} className={isRuleFired ? 'text-rose-400' : 'text-orange'} />
           ) : (
-            <Webhook size={12} className="text-orange" />
+            <Webhook size={12} className={isRuleFired ? 'text-rose-400' : 'text-orange'} />
           )}
-          <span>Standby for Trigger</span>
+          <span>{isRuleFired ? 'Rule Condition Fired! Dispatched' : 'Standby for Trigger'}</span>
         </div>
       </div>
     </div>

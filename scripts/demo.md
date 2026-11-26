@@ -1,21 +1,22 @@
-# NexusFlow: 8-Minute Mid-Project Review Demo Script
+# NexusFlow: 10-Minute Final Project Review Demo Script
 
-> **Purpose**: A concise, step-by-step presentation script designed for the Infotact Solutions Mid-Project Review. Demonstrates end-to-end telemetry ingestion, visual rule modeling, RxJS stream execution, alert cooldowns, and performance benchmarks.
+> **Purpose**: A concise, step-by-step presentation script designed for the Infotact Solutions Final Project Review. Demonstrates end-to-end telemetry ingestion, visual rule modeling, RxJS stream execution, real-time wire glow & node feedback, outbound action dispatchers, SSRF firewall protection, and performance benchmarks.
 
 ---
 
-## Demo Overview & Timeline (8 Minutes Total)
+## Demo Overview & Timeline (10 Minutes Total)
 
 | Minute | Phase | Core Action | Key Takeaway for Evaluators |
 | :---: | :--- | :--- | :--- |
 | **0:00 - 1:00** | **1. Setup & Auth** | Seed demo data, start servers, log in | Clean JWT authentication & idempotent demo state |
-| **1:00 - 2:30** | **2. Canvas & DAG UX** | Load Template 1, test Undo/Redo & Auto-Layout | Visual flowchart builder with topological validation |
-| **2:30 - 3:30** | **3. Live Validation** | Break link & show Problems panel + red highlights | Real-time DAG acyclicity & orphan detection |
-| **3:30 - 4:30** | **4. Compile & Activate** | Compile Check modal, click Activate | Dynamic RxJS compilation & in-memory subscription |
-| **4:30 - 5:30** | **5. Live Ingestion & Alerts** | Run `mockSensor.js`, show live alerts drawer | Cooldown suppression throttles alert storms |
-| **5:30 - 6:30** | **6. Serialization Proof** | Inspect JSON & show 15-node DAG schema compliance | Portable, declarative DAG architecture |
-| **6:30 - 7:30** | **7. Load Test Benchmark** | Run `loadTest.js` with warmup and p50/p95 latency | Honest, sustained throughput & sub-second latency |
-| **7:30 - 8:00** | **8. Storage Audit & Q&A** | Run `storageStats.js` and conclude | 7.39 bytes/doc (93.8% space reduction on Atlas) |
+| **1:00 - 2:00** | **2. Canvas & DAG UX** | Load Template 1, test Undo/Redo & Auto-Layout | Visual flowchart builder with topological validation |
+| **2:00 - 3:00** | **3. Live Validation** | Break link & show Problems panel + red highlights | Real-time DAG acyclicity & orphan detection |
+| **3:00 - 4:00** | **4. Compile & Activate** | Compile Check modal, click Activate | Dynamic RxJS compilation & in-memory subscription |
+| **4:00 - 5:30** | **5. Live Wire Glow & Telemetry** | Start `mockSensor.js`, watch animated glowing wires | Real-time 5Hz throttled activity tap & node pulse |
+| **5:30 - 7:00** | **6. Action Dispatcher & SSRF Test** | Open Deliveries drawer, inspect logs, test SSRF block | Webhook retries with backoff & SSRF firewall |
+| **7:00 - 8:00** | **7. Serialization Proof** | Inspect JSON & show 15-node DAG schema compliance | Portable, declarative DAG architecture |
+| **8:00 - 9:00** | **8. Load Test Benchmark** | Run `loadTest.js` with warmup and p50/p95 latency | 18,638 writes/sec sustained throughput |
+| **9:00 - 10:00** | **9. Storage Audit & Q&A** | Run `storageStats.js` and conclude | 5.19 bytes/doc (95.7% space reduction on Atlas) |
 
 ---
 
@@ -84,24 +85,39 @@
 
 ---
 
-### Step 5: Live Hardware Telemetry & Alert Cooldown (4:30 - 5:30)
-1. **Open Triggered Alerts Drawer**:
-   - Click the **Triggered Alerts** button in the dashboard navigation bar. A drawer opens on the right, actively polling `/api/alerts` every 5 seconds.
-2. **Start Simulated Hardware Generator**:
+### Step 5: Live Wire Glow & Node Activity Feedback (4:00 - 5:30)
+1. **Start Simulated Hardware Generator**:
    - Open a third terminal:
      ```powershell
      cd backend
      npm run mock
      ```
    - Simulated sensor begins emitting turbine temperatures (fluctuating between 70°C and 94°C).
-3. **Observe Alert Throttling**:
-   - When temperature spikes past 85°C, an alert immediately appears in the drawer:
-     `CRITICAL: Turbine-01 temperature 88.4°C exceeds 85°C limit!`
-   - Point out: Even though the sensor continues emitting readings above 85°C every 1,000ms, our **10-second cooldown suppression** prevents alert spam, protecting emergency notification channels from flooding.
+2. **Observe Real-Time Canvas Wire Glow**:
+   - As sensor packets arrive, the connecting wires (`GlowEdge`) light up with an animated cyan flowing dash overlay.
+   - The status strip at the top of the canvas displays the live stream throughput (e.g. `Stream Throughput: 1 ev/s`).
+   - The `DataSourceNode` lights up with a green `LIVE` pulsing dot.
+   - The `MathOperationNode` displays a live computed value badge (e.g. `Last: 88.4`).
+   - Point out: "Notice our performance optimization: individual nodes and edges subscribe to their own event taps without re-rendering the entire React Flow canvas."
+   - Toggle **Live Wires** button in the status strip to demonstrate that operators can mute animations whenever desired.
 
 ---
 
-### Step 6: Graph Serialization & Schema Proof (5:30 - 6:30)
+### Step 6: Outbound Action Dispatcher & SSRF Firewall Defense (5:30 - 7:00)
+1. **Trigger Alert Condition**:
+   - When temperature spikes past 85°C, the Action Trigger node flashes rose (`⚡ FIRED!`).
+2. **Open Deliveries Drawer**:
+   - Click the **Deliveries** button in the top navigation bar.
+   - The drawer reveals the complete audit trail of outbound webhook/SMS executions with timestamps, HTTP status codes, and payload payloads.
+3. **Demonstrate SSRF Firewall Defense**:
+   - Under "Test Outbound Dispatch", enter target URL `http://127.0.0.1:27017` and click **Send Test Dispatch**.
+   - Notice the instant rejection:
+     `❌ SSRF Blocked: Hostname "127.0.0.1" points to a local or internal host.`
+   - Point out: "NexusFlow protects internal microservices and cloud metadata services (`169.254.169.254`) by filtering private IP ranges before any HTTP socket is opened."
+
+---
+
+### Step 7: Graph Serialization & Schema Proof (7:00 - 8:00)
 1. **Inspect Serialized JSON**:
    - Click **JSON** in the toolbar.
    - Show the clean JSON schema: version, metadata, coordinates, and typed node configurations.
@@ -112,7 +128,7 @@
 
 ---
 
-### Step 7: High-Throughput Ingestion Load Test (6:30 - 7:30)
+### Step 8: High-Throughput Ingestion Load Test (8:00 - 9:00)
 1. **Execute High-Speed Batch Load Test**:
    ```powershell
    cd backend
@@ -137,6 +153,10 @@
    - Point out:
      - Warm-up phase completed smoothly.
      - 0 failures across hundreds of thousands of records.
+
+---
+
+### Step 9: Storage Efficiency Audit & Concluding Defense (9:00 - 10:00)
      - Median batch latency (**p50: 152 ms**) and 95th percentile latency (**p95: 340 ms**).
      - Achieved **22,570 writes/sec**, comfortably exceeding the 5,000 writes/sec target.
 

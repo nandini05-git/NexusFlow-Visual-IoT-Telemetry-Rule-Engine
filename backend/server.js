@@ -1,9 +1,11 @@
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import app from './src/app.js';
 import { connectDB } from './src/config/db.js';
 import ruleRunner from './src/compiler/ruleRunner.js';
+import activityTracker from './src/services/activityTracker.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,17 +15,71 @@ export const server = http.createServer(app);
 // Setup WebSocket server
 export const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws) => {
-  console.log('[WebSocket] Client connected to telemetry stream');
+wss.on('connection', (ws, req) => {
+  const secret = process.env.JWT_SECRET || 'nexusflow_jwt_secret_key_production_random_string_2026';
 
-  ws.send(JSON.stringify({
-    type: 'CONNECTION_ESTABLISHED',
-    message: 'Connected to NexusFlow telemetry stream',
-    timestamp: new Date().toISOString(),
-  }));
+  // Parse URL query parameters if present (?token=...&graphId=...)
+  try {
+    const urlObj = new URL(req.url, 'http://localhost');
+    const token = urlObj.searchParams.get('token');
+    const graphId = urlObj.searchParams.get('graphId');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, secret);
+        const userId = decoded.id || decoded.userId;
+        if (userId) {
+          activityTracker.registerSocket(ws, userId, graphId);
+        }
+      } catch {
+        // Token invalid, proceed as anonymous telemetry listener
+      }
+    }
+  } catch {
+    // Malformed request URL
+  }
+
+  ws.send(
+    JSON.stringify({
+      type: 'CONNECTION_ESTABLISHED',
+      message: 'Connected to NexusFlow telemetry stream',
+      timestamp: new Date().toISOString(),
+    })
+  );
+
+  // Handle graph subscription messages from browser client
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw);
+      if (msg.type === 'subscribeGraph' || msg.type === 'auth') {
+        const token = msg.token;
+        if (token) {
+          try {
+            const decoded = jwt.verify(token, secret);
+            const userId = decoded.id || decoded.userId;
+            if (userId) {
+              activityTracker.registerSocket(ws, userId, msg.graphId);
+              ws.send(
+                JSON.stringify({
+                  type: 'GRAPH_SUBSCRIBED',
+                  graphId: msg.graphId,
+                  timestamp: new Date().toISOString(),
+                })
+              );
+            }
+          } catch {
+            ws.send(JSON.stringify({ type: 'ERROR', message: 'Invalid token for graph subscription' }));
+          }
+        } else if (msg.graphId && ws.ownerId) {
+          activityTracker.subscribeGraph(ws, msg.graphId);
+        }
+      }
+    } catch {
+      // Ignored non-JSON messages
+    }
+  });
 
   ws.on('close', () => {
-    console.log('[WebSocket] Client disconnected');
+    activityTracker.unregisterSocket(ws);
   });
 
   ws.on('error', (err) => {

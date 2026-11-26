@@ -70,3 +70,15 @@ export const fetchAlerts = async (params = {}) => {
   const res = await client.get('/api/alerts', { params });
   return res.data;
 };
+
+// Fetch outbound delivery history (GET /api/deliveries?graphId=&status=&limit=)
+export const fetchDeliveries = async (params = {}) => {
+  const res = await client.get('/api/deliveries', { params });
+  return res.data;
+};
+
+// Test an action dispatch on-demand (POST /api/actions/test)
+export const testActionDispatch = async (payload) => {
+  const res = await client.post('/api/actions/test', payload);
+  return res.data;
+};

@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { Cpu, Calculator, Filter, Sigma, TrendingDown, TrendingUp } from 'lucide-react';
+import { graphActivityStore } from '../../utils/graphActivityStore';
 
 export default function MathOperationNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
+  const [activity, setActivity] = useState(() => graphActivityStore.getNodeState(id));
+
+  useEffect(() => {
+    return graphActivityStore.subscribeNode(id, (state) => {
+      setActivity(state);
+    });
+  }, [id]);
 
   const operation = data.operation || 'threshold';
   const operator = data.operator || '>';
@@ -28,10 +36,12 @@ export default function MathOperationNode({ id, data, isConnectable }) {
 
   const hasError = !!data.hasError;
   const errorMessage = data.errorMessage;
+  const isHot = activity.isHot;
+  const hasLastVal = isHot && activity.lastValue !== undefined && activity.lastValue !== null;
 
   return (
     <div
-      className={`flow-node flow-node-math ${hasError ? 'flow-node-error' : ''}`}
+      className={`flow-node flow-node-math ${hasError ? 'flow-node-error' : ''} ${isHot ? 'node-hot-active' : ''}`}
       title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
     >
       {/* Input handle on the left */}
@@ -46,11 +56,15 @@ export default function MathOperationNode({ id, data, isConnectable }) {
       <div className="flow-node-header">
         <Cpu size={16} className="text-purple" />
         <span className="flow-node-title">{data.label || 'Math Operation'}</span>
-        {hasError && (
+        {hasError ? (
           <span className="flow-node-error-badge" title={errorMessage}>
             ⚠️ Config Error
           </span>
-        )}
+        ) : hasLastVal ? (
+          <span className="node-val-pill" title={`Recent computed value: ${activity.lastValue}`}>
+            Val: {typeof activity.lastValue === 'number' ? activity.lastValue.toFixed(1) : activity.lastValue}
+          </span>
+        ) : null}
       </div>
 
       <div className="flow-node-body">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import Sidebar from '../components/Sidebar';
+import DeliveriesPanel from '../components/DeliveriesPanel';
 import { checkHealth, getTelemetry, getTelemetryStats } from '../api/client';
 import { fetchAlerts, fetchUserGraphs, deleteRuleGraph, updateRuleGraph } from '../api/graphs';
 import { useAuth } from '../context/AuthContext';
@@ -26,6 +27,7 @@ import {
   Edit3,
   Check,
   Zap,
+  Send,
   ExternalLink,
 } from 'lucide-react';
 
@@ -65,6 +67,9 @@ export default function Dashboard() {
   const [graphsError, setGraphsError] = useState(null);
   const [editingGraphId, setEditingGraphId] = useState(null);
   const [renamedTitle, setRenamedTitle] = useState('');
+
+  // Deliveries Panel State (Week 4 Day 1)
+  const [showDeliveriesPanel, setShowDeliveriesPanel] = useState(false);
 
   // Fetch Health Check
   const fetchHealth = useCallback(async () => {
@@ -257,6 +262,7 @@ export default function Dashboard() {
               setShowAlertsPanel(!showAlertsPanel);
               if (showDataPanel) setShowDataPanel(false);
               if (showGraphsPanel) setShowGraphsPanel(false);
+              if (showDeliveriesPanel) setShowDeliveriesPanel(false);
             }}
             className={`toggle-drawer-btn ${showAlertsPanel ? 'active' : ''}`}
             title="Inspect triggered rule alerts log"
@@ -271,6 +277,21 @@ export default function Dashboard() {
                 {alerts.length}
               </span>
             )}
+          </button>
+
+          {/* Outbound Deliveries Drawer Toggle */}
+          <button
+            onClick={() => {
+              setShowDeliveriesPanel(!showDeliveriesPanel);
+              if (showAlertsPanel) setShowAlertsPanel(false);
+              if (showDataPanel) setShowDataPanel(false);
+              if (showGraphsPanel) setShowGraphsPanel(false);
+            }}
+            className={`toggle-drawer-btn ${showDeliveriesPanel ? 'active' : ''}`}
+            title="Inspect outbound webhook & SMS delivery logs"
+          >
+            <Send size={15} className="text-cyan" />
+            <span>Deliveries</span>
           </button>
 
           {/* My Graphs Drawer Toggle */}
@@ -700,6 +721,12 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Deliveries Drawer (Week 4 Day 1) */}
+      <DeliveriesPanel
+        isOpen={showDeliveriesPanel}
+        onClose={() => setShowDeliveriesPanel(false)}
+      />
     </div>
   );
 }

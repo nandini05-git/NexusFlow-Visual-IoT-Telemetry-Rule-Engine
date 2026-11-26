@@ -1,6 +1,7 @@
 import DataSourceNode from './DataSourceNode';
 import MathOperationNode from './MathOperationNode';
 import ActionTriggerNode from './ActionTriggerNode';
+import GlowEdge from '../edges/GlowEdge';
 import {
   Database,
   Thermometer,
@@ -23,6 +24,15 @@ export const nodeTypes = {
   dataSource: DataSourceNode,
   mathOperation: MathOperationNode,
   actionTrigger: ActionTriggerNode,
+};
+
+/**
+ * React Flow Edge Type Mapping
+ * High-performance animated glow edges with source-node subscription
+ */
+export const edgeTypes = {
+  glow: GlowEdge,
+  default: GlowEdge,
 };
 
 /**

@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import { Database, Radio } from 'lucide-react';
+import { Database, Radio, Activity } from 'lucide-react';
+import { graphActivityStore } from '../../utils/graphActivityStore';
 
 export default function DataSourceNode({ id, data, isConnectable }) {
   const { updateNodeData } = useReactFlow();
+  const [activity, setActivity] = useState(() => graphActivityStore.getNodeState(id));
+
+  useEffect(() => {
+    return graphActivityStore.subscribeNode(id, (state) => {
+      setActivity(state);
+    });
+  }, [id]);
 
   const deviceId = data.deviceId || 'turbine-01';
   const sensorType = data.sensorType || 'temperature';
@@ -25,20 +33,27 @@ export default function DataSourceNode({ id, data, isConnectable }) {
 
   const hasError = !!data.hasError;
   const errorMessage = data.errorMessage;
+  const isHot = activity.isHot;
+  const eventCount = activity.count || 0;
 
   return (
     <div
-      className={`flow-node flow-node-source ${hasError ? 'flow-node-error' : ''}`}
+      className={`flow-node flow-node-source ${hasError ? 'flow-node-error' : ''} ${isHot ? 'node-hot-active' : ''}`}
       title={hasError ? `Configuration issue: ${errorMessage}` : undefined}
     >
       <div className="flow-node-header">
         <Database size={16} className="text-cyan" />
         <span className="flow-node-title">{data.label || 'Data Source'}</span>
-        {hasError && (
+        {hasError ? (
           <span className="flow-node-error-badge" title={errorMessage}>
             ⚠️ Config Error
           </span>
-        )}
+        ) : isHot ? (
+          <span className="node-active-pill" title="Live telemetry receiving">
+            <span className="node-active-dot" />
+            LIVE
+          </span>
+        ) : null}
       </div>
 
       <div className="flow-node-body">
@@ -67,10 +82,15 @@ export default function DataSourceNode({ id, data, isConnectable }) {
         </div>
 
         <div className="node-status-bar">
-          <Radio size={12} className="pulse-icon text-cyan" />
+          <Radio size={12} className={`pulse-icon text-cyan ${isHot ? 'pulse-fast' : ''}`} />
           <span>
             Stream: {deviceId} ({sensorType})
           </span>
+          {isHot && (
+            <span className="node-event-count ml-auto">
+              {eventCount > 1 ? `${eventCount} ev` : 'flow'}
+            </span>
+          )}
         </div>
       </div>
 

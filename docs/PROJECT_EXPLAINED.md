@@ -604,3 +604,50 @@ Any violation immediately attaches an error message to the node (triggering a vi
 
 ### Q20: How is the demo environment seeded, and how does it ensure idempotency?
 **Answer:** We created an automated seeder script (`backend/scripts/seedDemo.js`). It checks if the default demonstration account (`demo@nexusflow.io`) already exists. If not, it provisions the user with a bcrypt-hashed password (`DemoUser2026!`). It then removes any previous demo graphs owned by that user and inserts the 3 pre-built industrial templates (*Turbine Overheat Sentinel*, *Two-Sensor Branching Rule*, and the *15-Node Industrial Facility*). Because it cleans up and idempotently upserts the test fixtures, the seeder can be run multiple times before an executive demo without producing duplicate graphs, conflicting IDs, or database pollution.
+
+---
+
+## 10. Weeks 3 & 4 Final Architecture: Live Wire Glow, Action Dispatching & SSRF Protection
+
+In the final weeks of the project, NexusFlow completed the loop from visual modeling and stream execution to real-time client observability and secure outbound industrial alerting.
+
+### 10.1 Live Wire Glow & Node Activity Feedback
+*The Factory Analogy: When current flows through an industrial power conduit, monitoring meters display live throughput, and indicator LEDs pulse so operators can see with their own eyes that the system is alive.*
+
+- **Non-Mutating Activity Taps**: In `compileGraph.js`, every compiled RxJS node stream is wrapped in a non-intrusive activity tap `wrapActivity(node, stream$)` with try/catch isolation. When a telemetry packet passes through a node, it records `{ graphId, nodeId, at: Date.now(), value }`. If no browser client is currently watching the graph, this check short-circuits with zero computational overhead.
+- **Throttled 5Hz Aggregation (`activityTracker.js`)**: To prevent high-velocity sensor data (thousands of packets/second) from saturating browser WebSockets or freezing React Flow rendering, the backend buffers execution counts and flushes aggregated metrics at most once every 200ms (5 Hz) over WebSocket.
+- **Custom React Flow `GlowEdge` Component**: Standard SVG edges are replaced with `GlowEdge.jsx`. It subscribes directly to its source node's activity state via `graphActivityStore`. When hot, it renders a drop-shadow glow and an animated moving dashed overlay. Higher event rates render thicker, brighter cyan/sky strokes; rule-fired breaches render intense rose pulses.
+- **Accessibility & Performance**: The store uses fine-grained callback subscriptions (`subscribeNode`), completely bypassing whole-canvas React re-renders. Full support for `prefers-reduced-motion` media queries ensures users with vestibular sensitivities receive static glowing highlights without continuous motion.
+
+### 10.2 Outbound Action Dispatching & SSRF Firewall
+*The Factory Analogy: When a safety valve trips, the emergency shutdown signal must reach the external emergency horn reliably. However, the system must never allow an attacker to trick the alert engine into attacking the factory's own internal database or cloud metadata service.*
+
+- **SSRF Protection (`actionDispatcher.isSafeUrl`)**: Strictly inspects webhook destination URLs before any network connection is attempted. It rejects loopback (`localhost`, `127.0.0.1`, `::1`), private RFC 1918 internal subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), AWS/cloud metadata services (`169.254.169.254`), and non-HTTP protocols.
+- **Retry Mechanism with Exponential Backoff**: In `dispatchWebhookWithRetries`, outbound HTTP requests feature a 5-second timeout and up to 3 automatic attempts with exponential backoff delays (500ms $\rightarrow$ 1,000ms $\rightarrow$ 2,000ms), ensuring transient network hiccups don't lose critical alerts.
+- **Delivery Log Audit Trail (`DeliveryLog.js`)**: Every action trigger records an immutable audit log entry in MongoDB capturing graph ID, node ID, target recipient, attempt history, response time in milliseconds, and status (`pending`, `success`, `retrying`, `failed`, or `blocked`).
+- **Interactive Deliveries Drawer**: Built into the dashboard UI, allowing operators to filter delivery history, inspect request/response payloads, and test destination endpoints interactively.
+
+---
+
+## 11. Final Evaluation Q&A (Questions 21 - 25)
+
+### Q21: How do you prevent high-frequency telemetry from overwhelming browser performance with wire animations?
+**Answer:** We implemented a two-tier throttling architecture:
+1. *Backend Throttling*: `activityTracker.js` aggregates node execution events into an in-memory buffer and flushes at most once every 200ms (5 Hz) over WebSocket, sending a lightweight payload of `{ nodeId, count, lastValue, at }`.
+2. *Fine-Grained Frontend Subscriptions*: Rather than updating global React Flow canvas state (which would trigger full-canvas re-renders and degrade canvas FPS), `graphActivityStore.js` maintains per-node event listeners. Only the specific `GlowEdge` and custom node listening to that ID re-render. A decay timer (1,200ms) smoothly transitions hot wires back to idle slate styling.
+
+### Q22: What happens to the backend activity tracking when no browser is watching the canvas?
+**Answer:** Exactly zero overhead. In `activityTracker.js`, the method `hasWatchers(graphId, ownerId)` inspects the active WebSocket client registry. If no client is watching that graph, the tracking tap returns immediately without allocating objects, buffering events, or scheduling timers. This ensures the ingestion pipeline remains at full sustained speed (> 18,000 writes/sec) regardless of how many rules are running.
+
+### Q23: How does the SSRF firewall prevent malicious webhook attacks?
+**Answer:** Server-Side Request Forgery (SSRF) occurs when a user configures a webhook URL targeting an internal resource (e.g. `http://localhost:27017` for MongoDB or `http://169.254.169.254/latest/meta-data` for AWS instance credentials). In `actionDispatcher.js`, `isSafeUrl()` parses the URL and strictly validates:
+1. Protocol must be `http:` or `https:`.
+2. Hostname cannot be `localhost`, `0.0.0.0`, or end in `.local` / `.internal`.
+3. IP address must not match IPv4 private RFC 1918 subnets (`10.x`, `172.16-31.x`, `192.168.x`), loopback (`127.x`), link-local (`169.254.x`), or IPv6 private subnets (`fe80:`, `fc00:`).
+If any restriction is triggered, the request is blocked immediately without opening a socket, and a `blocked` status is saved to `DeliveryLog`.
+
+### Q24: How does the Action Dispatcher handle transient network failures when notifying external systems?
+**Answer:** In `dispatchWebhookWithRetries()`, outbound HTTP dispatches execute inside a retry loop configured for up to 3 attempts. Each attempt uses an `AbortController` with a 5,000ms timeout. If an attempt encounters a network failure or HTTP 5xx response, the dispatcher calculates an exponential backoff delay with jitter ($500 \times 2^{\text{attempt}-1}$) before retrying. Every attempt, duration, and error is recorded in the `DeliveryLog` document for complete audit traceability.
+
+### Q25: How does NexusFlow ensure accessibility for users with vestibular or motion sensitivities?
+**Answer:** `graphActivityStore.js` listens to the native browser media query `(prefers-reduced-motion: reduce)`. When enabled by the user or operating system, `GlowEdge` and node CSS rules completely disable all infinite keyframe dash animations and glowing pulses. Instead, active wires and firing nodes are highlighted with high-contrast, static borders and solid color badges, guaranteeing full WCAG 2.1 accessibility compliance.

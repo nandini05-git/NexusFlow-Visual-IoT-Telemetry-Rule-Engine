@@ -2950,3 +2950,313 @@ select:focus-visible {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   Week 4: Live Wire Glow, Node Activity Feedback & Canvas Status Strip
+   ========================================================================== */
+
+/* Animated Dash for Glowing Wires */
+@keyframes flowGlow {
+  from {
+    stroke-dashoffset: 28;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.glow-edge-animated {
+  animation: flowGlow 0.85s linear infinite;
+}
+
+/* Node Hot / Rule-Fired Rings */
+@keyframes nodePulseCyan {
+  0% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
+
+@keyframes nodeFlashRose {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(244, 63, 94, 0.9), inset 0 0 15px rgba(244, 63, 94, 0.4);
+    border-color: #f43f5e;
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4), inset 0 0 5px rgba(244, 63, 94, 0.2);
+    border-color: #fb7185;
+  }
+}
+
+.node-hot-active {
+  border-color: rgba(56, 189, 248, 0.8) !important;
+  animation: nodePulseCyan 1.8s infinite !important;
+}
+
+.node-rule-fired {
+  border-color: #f43f5e !important;
+  animation: nodeFlashRose 0.6s infinite !important;
+}
+
+.pulse-fast {
+  animation: spin 1s linear infinite !important;
+}
+
+/* Badges & Live Indicators on Nodes */
+.node-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  letter-spacing: 0.05em;
+}
+
+.node-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.node-val-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.node-fired-pill {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f43f5e;
+  color: #fff;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.8);
+}
+
+.node-event-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.status-fired {
+  color: #f43f5e !important;
+  font-weight: 600;
+}
+
+/* Canvas Live Activity Status Strip */
+.canvas-activity-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  z-index: 5;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.status-strip-left,
+.status-strip-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.strip-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.strip-status-badge.active {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.strip-status-badge.draft {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.strip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.strip-status-badge.active .strip-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: pulse 1.5s infinite;
+}
+
+.strip-status-badge.draft .strip-dot {
+  background: #64748b;
+}
+
+.strip-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #cbd5e1;
+}
+
+.strip-metric strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.strip-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #64748b;
+  padding-left: 8px;
+  border-left: 1px solid #334155;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.legend-dot.idle {
+  background: #475569;
+}
+
+.legend-dot.flowing {
+  background: #06b6d4;
+  box-shadow: 0 0 5px #06b6d4;
+}
+
+.legend-dot.high {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.legend-dot.fired {
+  background: #f43f5e;
+  box-shadow: 0 0 6px #f43f5e;
+}
+
+.btn-live-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+}
+
+.btn-live-toggle:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.btn-live-toggle.active {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+/* Dismissible Canvas Onboarding Hint */
+.canvas-onboarding-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, rgba(14, 116, 144, 0.2), rgba(15, 23, 42, 0.9));
+  border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  z-index: 4;
+}
+
+.hint-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint-dismiss-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hint-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .glow-edge-animated {
+    animation: none !important;
+    stroke-dasharray: none !important;
+  }
+  .node-hot-active,
+  .node-rule-fired,
+  .pulse-fast,
+  .strip-status-badge.active .strip-dot {
+    animation: none !important;
+  }
+  .node-hot-active {
+    outline: 2px solid #38bdf8 !important;
+  }
+  .node-rule-fired {
+    outline: 3px solid #f43f5e !important;
+  }
+}

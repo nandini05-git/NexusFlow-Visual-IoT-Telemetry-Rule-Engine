@@ -11,7 +11,8 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { nodeTypes } from './nodes/nodeRegistry';
+import { nodeTypes, edgeTypes } from './nodes/nodeRegistry';
+import { useGraphActivity } from '../hooks/useGraphActivity';
 import { validateGraph, serializeGraph, downloadGraphJson } from '../utils/serializeGraph';
 import { GRAPH_TEMPLATES } from '../utils/graphTemplates';
 import {
@@ -46,6 +47,10 @@ import {
   Keyboard,
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Radio,
 } from 'lucide-react';
 
 const defaultInitialNodes = [
@@ -92,8 +97,7 @@ const defaultInitialEdges = [
     target: 'math-1',
     sourceHandle: 'output',
     targetHandle: 'input',
-    animated: true,
-    style: { stroke: '#38bdf8', strokeWidth: 2 },
+    type: 'glow',
   },
   {
     id: 'edge-math1-action1',
@@ -101,8 +105,7 @@ const defaultInitialEdges = [
     target: 'action-1',
     sourceHandle: 'output',
     targetHandle: 'input',
-    animated: true,
-    style: { stroke: '#a855f7', strokeWidth: 2 },
+    type: 'glow',
   },
 ];
 
@@ -123,6 +126,24 @@ function CanvasInner() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
+
+  // Live WebSocket Activity & Metrics Hook
+  const {
+    eventsPerSecond,
+    lastAlertTime,
+    liveActivityEnabled,
+    prefersReducedMotion,
+    toggleLiveActivity,
+  } = useGraphActivity(currentGraphId, graphStatus === 'active');
+
+  // Dismissible Canvas Onboarding Hint State
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('nexusflow_canvas_hint_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // History State for Undo / Redo
   const [history, setHistory] = useState({
@@ -314,8 +335,7 @@ function CanvasInner() {
         addEdge(
           {
             ...params,
-            animated: true,
-            style: { stroke: '#38bdf8', strokeWidth: 2 },
+            type: 'glow',
           },
           eds
         )
@@ -523,7 +543,8 @@ function CanvasInner() {
 
       pushHistory(nodes, edges);
       setNodes(JSON.parse(JSON.stringify(template.graph.nodes)));
-      setEdges(JSON.parse(JSON.stringify(template.graph.edges)));
+      const templateEdges = (template.graph.edges || []).map((e) => ({ ...e, type: 'glow' }));
+      setEdges(templateEdges);
       setGraphName(template.name);
       setCurrentGraphId(null);
       setGraphStatus('draft');
@@ -599,7 +620,8 @@ function CanvasInner() {
           setGraphStatus(doc.status || 'draft');
           if (doc.graph && Array.isArray(doc.graph.nodes)) {
             setNodes(doc.graph.nodes);
-            setEdges(doc.graph.edges || []);
+            const loadedEdges = (doc.graph.edges || []).map((e) => ({ ...e, type: 'glow' }));
+            setEdges(loadedEdges);
             setCompileResult(null);
             setTimeout(() => fitView({ padding: 0.2 }), 50);
             showToast('success', `Loaded '${doc.name}' (${doc.status || 'draft'})`);
@@ -964,6 +986,65 @@ function CanvasInner() {
         </div>
       )}
 
+      {/* Dismissible Onboarding Tip Banner */}
+      {!hintDismissed && (
+        <div className="canvas-onboarding-hint">
+          <div className="hint-content">
+            <Sparkles size={15} className="text-cyan" />
+            <span>
+              <strong>First time?</strong> Drag nodes from the library, connect source ports to math/action inputs, then hit <strong>Compile Check</strong> to verify RxJS stream validity.
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setHintDismissed(true);
+              try {
+                localStorage.setItem('nexusflow_canvas_hint_dismissed', 'true');
+              } catch {
+                // ignore storage error
+              }
+            }}
+            className="hint-dismiss-btn"
+          >
+            Got it
+          </button>
+        </div>
+      )}
+
+      {/* Live Activity Status Strip */}
+      <div className="canvas-activity-strip">
+        <div className="status-strip-left">
+          <span className={`strip-status-badge ${graphStatus === 'active' ? 'active' : 'draft'}`}>
+            <span className="strip-dot" />
+            {graphStatus === 'active' ? 'Engine Active' : 'Draft Mode'}
+          </span>
+          <span className="strip-metric">
+            <Radio size={13} className="text-cyan" />
+            Events: <strong>{eventsPerSecond} /s</strong>
+          </span>
+          <span className="strip-metric">
+            <Activity size={13} className="text-purple" />
+            Last Alert: <strong>{lastAlertTime ? new Date(lastAlertTime).toLocaleTimeString() : 'None'}</strong>
+          </span>
+        </div>
+        <div className="status-strip-right">
+          <button
+            onClick={toggleLiveActivity}
+            className={`btn-live-toggle ${liveActivityEnabled ? 'active' : ''}`}
+            title="Toggle live telemetry animations on wires and nodes"
+          >
+            {liveActivityEnabled ? <Eye size={13} /> : <EyeOff size={13} />}
+            <span>Live Wires {liveActivityEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+          <div className="strip-legend">
+            <span className="legend-item"><span className="legend-dot idle" /> Idle</span>
+            <span className="legend-item"><span className="legend-dot flowing" /> Flowing</span>
+            <span className="legend-item"><span className="legend-dot high" /> High Rate</span>
+            <span className="legend-item"><span className="legend-dot fired" /> Fired</span>
+          </div>
+        </div>
+      </div>
+
       {/* React Flow Workspace */}
       <ReactFlow
         nodes={nodes}
@@ -974,6 +1055,8 @@ function CanvasInner() {
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'glow' }}
         isValidConnection={isValidConnection}
         deleteKeyCode={['Backspace', 'Delete']}
         fitView

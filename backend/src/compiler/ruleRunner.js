@@ -1,6 +1,8 @@
 import compileGraph from './compileGraph.js';
 import telemetryBus from './telemetryBus.js';
 import AlertEvent from '../models/AlertEvent.js';
+import actionDispatcher from '../services/actionDispatcher.js';
+import activityTracker from '../services/activityTracker.js';
 
 /**
  * RuleRunner Engine
@@ -82,6 +84,30 @@ class RuleRunner {
       } catch (err) {
         console.error(`[AlertEvent Save Error] Graph ${idStr}:`, err.message);
       }
+
+      // Outbound delivery with retries, exponential backoff & SSRF protection (non-blocking)
+      actionDispatcher
+        .dispatchAction({
+          graphId: idStr,
+          ownerId,
+          nodeId,
+          ruleName,
+          actionType: eventData.actionType || 'sms_alert',
+          target: eventData.target || '',
+          reading: eventData.reading || {},
+          message: alertMessage,
+        })
+        .catch((dispatchErr) => {
+          console.error(`[Action Dispatch Error] Graph ${idStr}:`, dispatchErr.message);
+        });
+
+      // Emit live ruleFired event to connected owner WebSocket watchers
+      activityTracker.recordRuleFired(idStr, ownerId, nodeId);
+    };
+
+    // Node activity hook: tapped on every node output
+    const onNodeActivity = ({ nodeId, value }) => {
+      activityTracker.recordNodeActivity(idStr, ownerId, nodeId, value);
     };
 
     // Compile into executable RxJS streams
@@ -89,6 +115,7 @@ class RuleRunner {
       ruleName,
       inputObservable: telemetryBus,
       actionListener,
+      onNodeActivity,
     });
 
     // Start pipeline subscriptions
@@ -128,6 +155,7 @@ class RuleRunner {
 
     entry.compiled.stop();
     this.activeGraphs.delete(idStr);
+    activityTracker.clearBuffer(idStr);
 
     // Clean up cooldown entries for this graph
     for (const key of this.lastTriggeredTimes.keys()) {
@@ -184,6 +212,7 @@ class RuleRunner {
     }
     this.activeGraphs.clear();
     this.lastTriggeredTimes.clear();
+    activityTracker.reset();
     return { success: true, stoppedCount };
   }
 }

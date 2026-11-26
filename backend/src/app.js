@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes.js';
 import ingestRoutes from './routes/ingest.routes.js';
 import graphRoutes from './routes/graph.routes.js';
 import alertRoutes from './routes/alert.routes.js';
+import deliveryRoutes from './routes/delivery.routes.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { authLimiter, apiLimiter, ingestLimiter } from './middleware/rateLimiters.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -53,13 +54,16 @@ app.get('/', (req, res) => {
       graphDeactivate: 'POST /api/graphs/:id/deactivate (Protected)',
       graphsActive: 'GET /api/graphs/active (Protected)',
       alerts: 'GET /api/alerts?graphId=&limit= (Protected)',
+      deliveries: 'GET /api/deliveries?graphId=&status=&limit= (Protected)',
+      testAction: 'POST /api/actions/test (Protected)',
     },
   });
 });
 
-// Auth, Ingestion, Rule Graph, and Alert routes with targeted rate limiters
+// Auth, Ingestion, Rule Graph, Alert, and Delivery routes with targeted rate limiters
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', ingestLimiter, ingestRoutes);
+app.use('/api', apiLimiter, deliveryRoutes);
 app.use('/api/graphs', apiLimiter, graphRoutes);
 app.use('/api/alerts', apiLimiter, alertRoutes);
 

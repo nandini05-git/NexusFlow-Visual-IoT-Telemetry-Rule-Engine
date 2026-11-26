@@ -1,4 +1,4 @@
-import { merge, Subscription } from 'rxjs';
+import { merge, Subscription, tap } from 'rxjs';
 import { share } from 'rxjs/operators';
 import { telemetryBus } from './telemetryBus.js';
 import { parseGraph } from './graphParser.js';
@@ -33,6 +33,32 @@ export const compileGraph = (rawGraph, options = {}) => {
   const ruleName = options.ruleName || plainGraph.name || 'NexusFlow Rule';
   const inputObservable = options.inputObservable || telemetryBus;
   const actionListener = options.actionListener || null;
+  const onNodeActivity = options.onNodeActivity || null;
+
+  // Lightweight activity tap: records node output without mutating or blocking data stream
+  const wrapActivity = (node, stream$) => {
+    if (typeof onNodeActivity !== 'function') return stream$;
+    return stream$.pipe(
+      tap({
+        next: (reading) => {
+          try {
+            const rawVal =
+              reading?.value !== undefined ? reading.value : reading?.metadata?.value;
+            const numericVal = Number(rawVal);
+            onNodeActivity({
+              nodeId: node.id,
+              nodeType: node.type,
+              value: !isNaN(numericVal) ? numericVal : undefined,
+              at: new Date().toISOString(),
+            });
+          } catch {
+            // Never mutate data, never throw into pipeline
+          }
+        },
+        error: () => {},
+      })
+    );
+  };
 
   // 1. Parse and validate DAG structure
   const { sortedNodes, edges } = parseGraph(graphData);
@@ -54,7 +80,7 @@ export const compileGraph = (rawGraph, options = {}) => {
     if (node.type === 'dataSource') {
       // Data Source taps directly into the inputObservable bus with filtering
       const filterOp = createDataSourceOperator(node);
-      const stream$ = inputObservable.pipe(filterOp, share());
+      const stream$ = wrapActivity(node, inputObservable.pipe(filterOp, share()));
       nodeObservables.set(node.id, stream$);
     } else if (node.type === 'mathOperation') {
       // Math Operation combines upstream streams, applies transforms, and shares output
@@ -74,7 +100,7 @@ export const compileGraph = (rawGraph, options = {}) => {
       const combinedStream$ =
         upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
       const mathOps = createMathOperationOperators(node);
-      const processedStream$ = combinedStream$.pipe(...mathOps, share());
+      const processedStream$ = wrapActivity(node, combinedStream$.pipe(...mathOps, share()));
       nodeObservables.set(node.id, processedStream$);
     } else if (node.type === 'actionTrigger') {
       // Action Trigger is a sink node; logs action or dispatches event
@@ -94,7 +120,7 @@ export const compileGraph = (rawGraph, options = {}) => {
       const combinedStream$ =
         upstreamStreams.length === 1 ? upstreamStreams[0] : merge(...upstreamStreams);
       const actionOps = createActionTriggerOperators(node, ruleName, actionListener);
-      const actionStream$ = combinedStream$.pipe(...actionOps, share());
+      const actionStream$ = wrapActivity(node, combinedStream$.pipe(...actionOps, share()));
       nodeObservables.set(node.id, actionStream$);
       sinkObservables.push({ nodeId: node.id, stream$: actionStream$ });
     }

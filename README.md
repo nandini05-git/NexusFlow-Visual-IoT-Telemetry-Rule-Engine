@@ -329,10 +329,12 @@ cd frontend; npm run build # Production asset bundle check
 | `POST` | `/api/graphs/:id/activate` | **Bearer Token** | Compile and execute graph against `telemetryBus`, set status `"active"` |
 | `POST` | `/api/graphs/:id/deactivate` | **Bearer Token** | Unsubscribe and stop active rule graph, set status `"draft"` |
 
-### Alert Event Endpoints
+### Alert Event & Delivery Endpoints
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/alerts` | **Bearer Token** | Retrieve triggered alert event history (supports `?graphId=<id>&limit=<n>`, default limit 50, max 200) |
+| `GET` | `/api/deliveries` | **Bearer Token** | Retrieve outbound action delivery audit logs with retry attempts and status |
+| `POST` | `/api/actions/test` | **Bearer Token** | Diagnostic action dispatch tester with instant SSRF protection rejection |
 
 > [!NOTE]
 > **Server Startup Behavior**: On server startup, graphs are preserved in MongoDB with their status (`draft` or `active`), but they are **not auto-activated** into memory automatically. They can be dynamically activated on-demand via the canvas UI or the `POST /api/graphs/:id/activate` endpoint.
@@ -449,19 +451,22 @@ node scripts/seedDemo.js
 | :--- | :--- | :---: |
 | **Week 1** | Native MongoDB Time-Series ingestion, REST APIs, React Flow canvas scaffolding, JWT auth, load test | **DONE** |
 | **Week 2** | RxJS Logic Compiler, Rule Runner engine, alert cooldowns, canvas UX, demo seeder, audit evidence, E2E smoke test | **DONE (SUBMITTED: [Package](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md), TAG: `week2-mid-review`)** |
-| **Transition** | **Between Week 2 & 3**: Build sanity check, [Feedback Log](file:///c:/NexusFlow/docs/mid-review-feedback.md), [Technical Backlog](file:///c:/NexusFlow/docs/backlog.md), and [Week 3 Architecture Plan](file:///c:/NexusFlow/docs/week3-plan.md) | **COMPLETE** |
-| **Week 3** | WebSocket live telemetry streaming, pulsing wire animations, real-time node badges, live Recharts dashboards | **PLANNED** |
-| **Week 4** | Production alert dispatchers (real Twilio SMS & Webhooks), actuator controls, Docker containerization | **PLANNED** |
+| **Week 3** | WebSocket live telemetry streaming, zero-cost watcher check, dynamic throughput monitoring | **DONE** |
+| **Week 4** | SSRF firewall protection, outbound webhook retries with backoff, delivery audit logs, live wire glow (`GlowEdge`), node activity feedback, and final evaluation package | **DONE (FINAL REPORT: [Report](file:///c:/NexusFlow/docs/FINAL_REPORT.md), TAG: `week4-final`)** |
 
 ---
 
-### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback (Upcoming)**
-- [ ] **WebSocket Telemetry Stream**: Connect incoming sensor telemetry to active WebSocket rooms.
-- [ ] **Live Visual Feedback**: Dynamic pulse animations on React Flow connection edges when telemetry flows through.
-- [ ] **Canvas Real-Time Badges**: Live stream value pills on nodes displaying latest evaluated readings in browser.
-- [ ] **Live Telemetry Dashboards**: Real-time Recharts visual graphs charting incoming metric streams.
+### **Week 3: Live Telemetry Streaming & Real-Time Canvas Feedback (Complete)**
+- [x] **WebSocket Telemetry Stream**: Connect incoming sensor telemetry to active browser WebSockets with JWT token auth.
+- [x] **Real-Time Watcher Registry**: Subscriptions tracked per user and graph; zero-cost short-circuit when no client is watching.
+- [x] **Activity Throttler**: Aggregated 5Hz (200ms) event tap preventing socket flood.
 
-### **Week 4: Webhooks, Actuator Alerting & Production Hardening (Final)**
-- [ ] **Outbound Action Webhooks**: Automated dispatching to external APIs and real SMS services when rules trigger.
-- [ ] **Actuator Controls**: Bi-directional command dispatch to physical IoT edge devices.
-- [ ] **Final Deployment**: Docker containerization, staging deployment, and end-to-end integration polish.
+### **Week 4: Webhooks, Wire Glow & Production Polish (Complete)**
+- [x] **SSRF Firewall Protection**: `actionDispatcher.isSafeUrl()` blocks loopback, private RFC 1918 subnets, and cloud metadata (169.254.169.254).
+- [x] **Outbound Action Webhooks & Retries**: Automated dispatch with exponential backoff (3 attempts) and mock SMS gateway.
+- [x] **Delivery Audit Trail**: `DeliveryLog` schema recording execution times, HTTP status, and attempt breakdowns.
+- [x] **Interactive Deliveries Drawer**: Slide-out drawer with status filters, payload inspector, and SSRF diagnostic tool.
+- [x] **Visual Canvas Wire Glow**: Custom `GlowEdge` with particle overlay, glowing animated strokes, and throughput thickness.
+- [x] **Node Activity & Feedback**: Pulsing LIVE dots on data sources, live computed values on math nodes, and flashing rose rings on fired actions.
+- [x] **Accessibility & Usability**: Full support for `prefers-reduced-motion`, status strip with live throughput & legend, and dismissible onboarding hints.
+- [x] **Comprehensive Test Suites**: Vitest and Node test suites covering action dispatchers, activity trackers, and client activity stores.
