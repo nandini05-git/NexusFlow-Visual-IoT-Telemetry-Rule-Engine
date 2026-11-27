@@ -9,6 +9,10 @@ import DeliveryLog from '../models/DeliveryLog.js';
 
 // Private / restricted IP CIDR and hostname check for SSRF prevention
 export const isSafeUrl = (urlString) => {
+  if (process.env.ALLOW_PRIVATE_WEBHOOKS === 'true') {
+    return { safe: true };
+  }
+
   try {
     const parsed = new URL(urlString);
 

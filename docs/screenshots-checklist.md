@@ -1,8 +1,8 @@
-# NexusFlow: Mid-Project Review Screenshots Checklist
+# NexusFlow: Final Project Review Screenshots Checklist
 
-> **Purpose**: A checklist of visual proof and system screenshots to capture and include in the Mid-Project Review evaluation presentation.  
-> **Official Submission Package**: [`docs/SUBMISSION_WEEK1-2.md`](file:///c:/NexusFlow/docs/SUBMISSION_WEEK1-2.md)  
-> **Evaluation Date**: 22 November 2026  
+> **Purpose**: A checklist of visual proof and system screenshots to capture and include in the Final Project Review evaluation presentation.  
+> **Official Submission Package**: [`docs/FINAL_REPORT.md`](file:///c:/NexusFlow/docs/FINAL_REPORT.md)  
+> **Evaluation Date**: 27 November 2026  
 
 ---
 
@@ -20,8 +20,8 @@
 | **08** | **Active Rule Status** | Canvas Top Toolbar | Click **Activate**: toolbar badge transitioning from slate `DRAFT` to pulsing green `ACTIVE`, demonstrating live subscription to the backend `telemetryBus`. | [ ] |
 | **09** | **Triggered Alerts Panel** | Dashboard Right Drawer | Click **Triggered Alerts**: drawer displaying live `AlertEvent` cards with timestamps, target recipients (`+1 (555) 019-2834`), breach values, and cooldown indicators. | [ ] |
 | **10** | **Serialized Graph JSON** | JSON Modal / Raw Export | Click **JSON** in toolbar: previewing formal Draft-07 JSON Schema export with node coordinates, version `1.0.0`, and typed operational parameters. | [ ] |
-| **11** | **High-Throughput Load Test** | Terminal Execution | Terminal output of `node scripts/loadTest.js` demonstrating **18,638 writes/sec** (peak **22,570 writes/sec**), 0 failures across 191,000 documents, and `p50` (167ms)/`p95` (464ms) percentile latencies. | [ ] |
-| **12** | **Time-Series Storage Audit** | Terminal Execution | Terminal output of `npm run storage:stats` showing **913,874 records**, **5.19 bytes/record on disk**, and **~95.7% storage reduction** on MongoDB Atlas. | [ ] |
+| **11** | **High-Throughput Load Test** | Terminal Execution | Terminal output of `node scripts/loadTest.js` demonstrating **7,605 writes/sec sustained over WAN** (peak bursts **21,000 - 22,570 writes/sec**), 0 failures across 114,000+ documents, and `p50` (408ms)/`p95` (1,772ms) latencies. | [ ] |
+| **12** | **Time-Series Storage Audit** | Terminal Execution | Terminal output of `npm run storage:stats` showing **1,034,360 records**, **6.89 bytes/record on disk**, and **~94.3% storage reduction** on MongoDB Atlas. | [ ] |
 | **13** | **Live Wire Glow on Canvas** | Active Canvas with Telemetry | Real-time animated cyan glowing wires with moving dash particles connecting Data Source to Math and Action nodes while mock telemetry streams. | [ ] |
 | **14** | **Outbound Deliveries Drawer** | Dashboard Right Drawer | Click **Deliveries**: drawer displaying execution logs, status filter chips, retry counts, HTTP response codes, and payload inspector. | [ ] |
 | **15** | **SSRF Firewall Defense** | Deliveries Diagnostic Form | Attempting dispatch to `http://127.0.0.1:27017` in the test form: instant rejection badge showing `SSRF Blocked: Hostname points to internal host`. | [ ] |

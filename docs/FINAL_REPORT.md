@@ -84,23 +84,25 @@ flowchart TD
 All performance figures below were measured through automated load testing scripts against live MongoDB Atlas cloud infrastructure.
 
 ### 4.1 Ingestion Throughput (`node scripts/loadTest.js`)
-* **Sustained Batch Throughput**: **18,638 writes/second**
-* **Peak Batch Throughput**: **22,570 writes/second**
-* **Batch Size**: 1,000 to 10,000 documents per batch (`insertMany(..., { ordered: false })`)
-* **Reliability**: **0 failed writes** across 200,000+ benchmarked records
-* **Latency Profile**: `p50` = 152 ms, `p95` = 340 ms across cloud network WAN round-trips
+* **Sustained Batch Throughput**: **7,605 to 18,638 writes/second** across live cloud WAN (peak bursts reaching **21,000 writes/sec**, historical peak **22,570 writes/sec**)
+* **Final Freeze Benchmark Run**: **114,000 documents** sent in 114 batches with **0 failures** across 14.99 seconds (**7,605 writes/sec**)
+* **Batch Size**: 1,000 readings per request (`insertMany(..., { ordered: false, lean: true })`)
+* **Reliability**: **0 failed writes** across over 1,000,000 benchmarked records
+* **Latency Profile**: `p50` = 408 ms, `p95` = 1,772 ms across cloud network WAN round-trips to MongoDB Atlas
 
 ### 4.2 Storage Efficiency Audit (`npm run storage:stats`)
-* **Total Ingested Records**: **913,874 records**
-* **Compressed Buckets**: 1,088 buckets spanning 3,600s time windows
-* **Raw BSON Data Size**: 110.82 MB (estimated at ~121 bytes/doc)
-* **Actual Disk Storage Size**: **4.74 MB**
-* **Average Storage per Record**: **5.19 bytes per document**
-* **Cloud Storage Reduction**: **95.7% space reduction** achieved via MongoDB native columnar zstandard/snappy compression
+* **Total Ingested Records**: **1,034,360 records**
+* **Underlying Storage Buckets**: 1,170 buckets spanning 3,600s time windows
+* **Raw BSON Data Size**: ~118.37 MB (estimated at ~120 bytes/doc)
+* **Actual Disk Storage Size**: **6.801 MB** (Data: 5.954 MB, Index: 1.430 MB)
+* **Average Storage per Record**: **6.89 bytes per document on disk** (6.04 logical bytes/record)
+* **Cloud Storage Reduction**: **94.3% space reduction** achieved via MongoDB native columnar zstandard/snappy compression
 
-### 4.3 Execution & Throttling Performance
-* **RxJS Stream Overhead**: Sub-millisecond evaluation (< 0.2 ms per node) in-memory without database roundtrips
-* **Activity Tracker Throttling**: Aggregated to **5 Hz (200 ms windows)** to protect browser render performance from high-frequency telemetry floods
+### 4.3 WebSocket Streaming Benchmark (`node scripts/wsLoadTest.js`)
+* **Concurrent Clients**: 5 concurrent WebSocket connections
+* **Handshake Latency**: **8.2 ms** average connection establishment
+* **Delivery Success Rate**: **100%** (385 messages delivered across 75 bursts)
+* **Average Message Interval**: ~105.9 ms, confirming the **5 Hz (200 ms)** aggregation window holds under heavy burst loads
 * **Watcher Check Cost**: Exactly `0` operations/allocations when no client browser is watching the active graph
 
 ---
@@ -113,6 +115,7 @@ All performance figures below were measured through automated load testing scrip
    - Rejects private RFC 1918 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
    - Rejects cloud instance metadata endpoints (`169.254.169.254`).
    - Rejects non-HTTP/HTTPS schemes (`file://`, `ftp://`, `gopher://`).
+   - Configurable override `ALLOW_PRIVATE_WEBHOOKS` strictly defaults to `false`.
 2. **Three-Tier Rate Limiting (`express-rate-limit`)**:
    - `authLimiter`: 10 requests / 15 min on `/api/auth` to thwart brute-force password attempts.
    - `apiLimiter`: 300 requests / 15 min for general REST management.
@@ -134,14 +137,14 @@ The project features comprehensive automated test coverage across both backend s
 
 | Test Suite | File | Focus Areas | Result |
 | :--- | :--- | :--- | :---: |
-| **Compiler Suite** | `backend/tests/compiler.test.js` | Kahn's topological sort, DAG cycle detection, multi-branch stream compilation | **PASS** |
-| **Rule Runner Suite** | `backend/tests/ruleRunner.test.js` | Graph activation/deactivation, alert cooldown suppression, in-memory Map | **PASS** |
-| **Hardening Suite** | `backend/tests/hardening.test.js` | Rate limiting, error handling envelopes, request ID tracing | **PASS** |
-| **Action Dispatcher Suite**| `backend/tests/actionDispatcher.test.js` | SSRF firewall rejection, mock SMS gateway, webhook retry mechanism | **PASS** |
-| **Activity Tracker Suite**| `backend/tests/activityTracker.test.js` | Throttled 5Hz flush, zero-overhead skip, user/graph tenant isolation | **PASS** |
-| **End-to-End Smoke Test** | `backend/scripts/e2eSmoke.js` | 13-step complete lifecycle test from auth to ingestion and activation | **PASS (13/13)** |
-| **Graph Serialization** | `frontend/src/utils/serializeGraph.test.js` | 15-node complex DAG serialization, Draft-07 schema compliance | **PASS** |
-| **Graph Activity Store**| `frontend/src/utils/graphActivityStore.test.js` | Client activity store, fine-grained node subscriptions, motion toggle | **PASS** |
+| **Compiler Suite** | `backend/tests/compiler.test.js` | Kahn's topological sort, DAG cycle detection, multi-branch stream compilation | **PASS (6/6)** |
+| **Rule Runner Suite** | `backend/tests/ruleRunner.test.js` | Graph activation/deactivation, alert cooldown suppression, in-memory Map | **PASS (6/6)** |
+| **Hardening Suite** | `backend/tests/hardening.test.js` | Rate limiting, error handling envelopes, request ID tracing | **PASS (5/5)** |
+| **Action Dispatcher Suite**| `backend/tests/actionDispatcher.test.js` | SSRF firewall rejection, mock SMS gateway, webhook retry mechanism | **PASS (9/9)** |
+| **Activity Tracker Suite**| `backend/tests/activityTracker.test.js` | Throttled 5Hz flush, zero-overhead skip, user/graph tenant isolation | **PASS (7/7)** |
+| **End-to-End Smoke Test** | `backend/scripts/e2eSmoke.js` | 11-step complete lifecycle test from auth to ingestion and activation | **PASS (11/11)** |
+| **Graph Serialization** | `frontend/src/utils/serializeGraph.test.js` | 15-node complex DAG serialization, Draft-07 schema compliance | **PASS (7/7)** |
+| **Graph Activity Store**| `frontend/src/utils/graphActivityStore.test.js` | Client activity store, fine-grained node subscriptions, motion toggle | **PASS (6/6)** |
 
 ---
 

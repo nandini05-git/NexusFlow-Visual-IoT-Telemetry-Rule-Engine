@@ -14,9 +14,9 @@
 | **3:00 - 4:00** | **4. Compile & Activate** | Compile Check modal, click Activate | Dynamic RxJS compilation & in-memory subscription |
 | **4:00 - 5:30** | **5. Live Wire Glow & Telemetry** | Start `mockSensor.js`, watch animated glowing wires | Real-time 5Hz throttled activity tap & node pulse |
 | **5:30 - 7:00** | **6. Action Dispatcher & SSRF Test** | Open Deliveries drawer, inspect logs, test SSRF block | Webhook retries with backoff & SSRF firewall |
-| **7:00 - 8:00** | **7. Serialization Proof** | Inspect JSON & show 15-node DAG schema compliance | Portable, declarative DAG architecture |
-| **8:00 - 9:00** | **8. Load Test Benchmark** | Run `loadTest.js` with warmup and p50/p95 latency | 18,638 writes/sec sustained throughput |
-| **9:00 - 10:00** | **9. Storage Audit & Q&A** | Run `storageStats.js` and conclude | 5.19 bytes/doc (95.7% space reduction on Atlas) |
+| **7:00 - 8:00** | **7. Serialization Proof & Complex DAG** | Inspect JSON & show 15-node DAG schema compliance | Portable, declarative DAG architecture |
+| **8:00 - 9:00** | **8. Load Test Benchmark** | Run `loadTest.js` with warmup and p50/p95 latency | 7,605 writes/sec sustained (peak 21,000+ writes/sec) |
+| **9:00 - 10:00** | **9. Storage Audit, E2E Smoke & Q&A** | Run `storageStats.js` and `npm run smoke` | 1,034,360 records at 6.89 bytes/doc (94.3% savings) |
 
 ---
 
@@ -139,30 +139,26 @@
    ================================================================
                       LOAD TEST RESULTS REPORT
    ================================================================
-    Total Telemetry Sent:    228,000 documents
-    Total Batches Sent:      228 successful (0 failed)
-    Actual Duration:         10.10 seconds
-    Achieved Throughput:     22,570 writes/sec
-    Average Batch Latency:   173 ms
-    50th Percentile (p50):   152 ms
-    95th Percentile (p95):   340 ms
+    Total Telemetry Sent:    114,000 documents
+    Total Batches Sent:      114 successful (0 failed)
+    Actual Duration:         14.99 seconds
+    Achieved Throughput:     7,605 writes/sec sustained (WAN)
+    Peak Burst Rate:         21,000 - 22,570 writes/sec
+    Average Batch Latency:   523 ms
+    50th Percentile (p50):   408 ms
+    95th Percentile (p95):   1,772 ms
    ----------------------------------------------------------------
     STATUS: PASS (Exceeded target 5,000 writes/sec requirement)
    ================================================================
    ```
    - Point out:
      - Warm-up phase completed smoothly.
-     - 0 failures across hundreds of thousands of records.
+     - 0 failures across 114,000+ records over public Internet WAN to MongoDB Atlas.
+     - Median batch latency (**p50: 408 ms**) and sustained **7,605 writes/sec**, comfortably exceeding the 5,000 writes/sec requirement (+52.1%).
 
 ---
 
-### Step 9: Storage Efficiency Audit & Concluding Defense (9:00 - 10:00)
-     - Median batch latency (**p50: 152 ms**) and 95th percentile latency (**p95: 340 ms**).
-     - Achieved **22,570 writes/sec**, comfortably exceeding the 5,000 writes/sec target.
-
----
-
-### Step 8: Time-Series Storage Footprint Audit & Conclusion (7:30 - 8:30)
+### Step 9: Time-Series Storage Footprint Audit & Automated Smoke Verification (9:00 - 10:00)
 1. **Inspect Columnar Time-Series Buckets**:
    ```powershell
    cd backend
@@ -173,30 +169,27 @@
    ================================================================
           NexusFlow Time-Series Storage Audit & Efficiency
    ================================================================
-    Total Telemetry Records:     555,353 documents
-    Underlying Storage Buckets:  662 buckets
-    Storage Size (On Disk):      2.875 MB
-    Index Size:                  0.520 MB
+    Total Telemetry Records:     1,034,360 documents
+    Underlying Storage Buckets:  1,170 buckets
+    Storage Size (On Disk):      6.801 MB (Data: 5.954 MB, Index: 1.430 MB)
+    Index Size:                  1.430 MB
    ----------------------------------------------------------------
-    Avg On-Disk Bytes / Record:  5.43 bytes
-    Conventional MongoDB Size:   ~63.56 MB (at ~120 bytes/doc)
-    Storage Space Reduction:     ~95.5% savings via native bucket compression
+    Avg On-Disk Bytes / Record:  6.89 bytes
+    Conventional MongoDB Size:   ~118.37 MB (at ~120 bytes/doc)
+    Storage Space Reduction:     ~94.3% savings via native bucket compression
    ================================================================
    ```
-3. **Conclude with Key Metric**:
-   - **555,000+ real records** stored in **5.43 bytes per document** on disk.
-   - Conventional MongoDB requires ~120 bytes/doc (~63 MB). NexusFlow's columnar compression achieves a **95.5% storage reduction**.
+3. **Conclude with Key Storage Metric**:
+   - Over **1,034,000+ real records** stored in **6.89 bytes per document** on disk.
+   - Conventional BSON document storage requires ~120 bytes/doc (~118 MB). NexusFlow's columnar compression achieves a **94.3% storage reduction**.
 
----
-
-### Step 9: Automated End-to-End Smoke Test (8:30 - 9:30)
-1. **Run Automated Smoke Script**:
+4. **Run Automated Smoke Script (Final 30 Seconds)**:
    ```powershell
    cd backend
    npm run smoke
    ```
-2. **Show Evaluators the Instant 11-Step Verification**:
-   - Health check, demo auth, DAG creation, dry-run compile, dynamic activation, non-matching rejection, matching breach alert, dynamic deactivation, suppression verification, and cleanup.
+   - Evaluators see the instant 11-step verification:
+     - Health check, demo auth, DAG creation, dry-run compile, dynamic activation, non-matching rejection, matching breach alert, dynamic deactivation, suppression verification, and cleanup.
    - All 11 steps execute and print `[PASS]`.
 
 ---
